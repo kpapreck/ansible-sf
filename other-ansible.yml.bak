@@ -1,0 +1,291 @@
+######################################################################
+##### Ansible to follow Charter Test Plan Word Doc for SolidFire #####
+######################################################################
+
+
+---
+- hosts: localhost
+  vars_files:
+  - 'sfsecrets.yml'
+
+  vars:
+   id: "1"
+   volsize: 4
+   volname: ansiblevol1
+   volname2: ansiblevol2
+   snapID: "231"
+   account_name: ansible_acct
+   account_name_new: ansible_acct_renamed
+   nodeid: nodeName
+   min: 5000
+   max: 6000
+   burst: 8000
+   qos_policy_name: gold-open
+
+  tasks:
+#update the QoS on a volume specifying the QoS either as a variable which is not currently listed above or calling an extra variable as shown here
+#example: ansible-playbook ansible-element.yml --tags=update-vol,update-vol-qos --extra-vars="min=100 max=200 burst=300"
+  - name: Update SolidFire Volume with Specified QoS
+    na_elementsw_volume:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      name: "{{ volname }}"
+      qos: {minIOPS: "{{ min }}", maxIOPS: "{{ max }}", burstIOPS: "{{ burst }}"}
+      account_id: "{{ id }}"
+      enable512e: True
+      size: 100
+      size_unit: gb
+    tags:
+    - update-vol-qos
+
+#update QoS Policy to specificed QoS values from extra-vars or from the vars above
+  - name: Update SolidFire QoS Policy specifying variables
+    na_elementsw_qos_policy:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      qos: {minIOPS: "{{ min }}", maxIOPS: "{{ max }}", burstIOPS: "{{ burst }}"}
+      account_id: "{{ id }}"
+      name: "{{ qos_policy_name }}"
+    tags:
+    - update-qos-policy
+
+#update QoS Policy to specificed QoS policy back to 5k, 200k, 200k
+  - name: Update SolidFire QoS Policy specifying variables
+    na_elementsw_qos_policy:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      qos: {minIOPS: "{{ min }}", maxIOPS: "{{ max }}", burstIOPS: "{{ burst }}"}
+      account_id: "{{ id }}"
+      name: "{{ qos_policy_name }}"
+    tags:
+    - update-qos-policy
+
+
+
+
+
+
+#delete the volume which has a name of volname from the top variables
+  - name: Delete SolidFire Volume
+    na_elementsw_volume:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: absent
+      name: "{{ volname }}"
+      account_id: "{{ id }}"
+    tags:
+    - delete-vol
+
+#delete the volume which has a name of volname2 from the top variables
+  - name: Delete SolidFire Volume 2
+    na_elementsw_volume:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: absent
+      name: "{{ volname2 }}"
+      account_id: "{{ id }}"
+    tags:
+    - delete-vol
+
+
+#clone a volume. This will use the source volume ID being the volume name and optionally can have a source snapshot ID, which I am using here.
+  - name: Clone SolidFire Volume
+    na_elementsw_volume_clone:      
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      name: CloneAnsibleVolume
+      src_volume_id: "{{ volname }}"
+      src_snapshot_id: "{{ snapID }}"
+      account_id: "{{ id }}"
+      access: readWrite
+      attributes: {}
+    tags:
+    - clone-vol
+
+#create a snapshot schedule with 1 or more volumes. This will create a consistant snapshot schedule (consistency group) across a number of volumes. 
+#In this example, I am calling 2 volumes to be a part of the snapshot schedule
+  - name: Create Snapshot schedule
+    na_elementsw_snapshot_schedule:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      recurring: yes
+      retention: 72
+      name: Schedule_A
+      schedule_type: TimeIntervalFrequency
+      time_interval_days: 1
+      starting_date: '2020-09-01T00:00:00Z'
+      volumes:
+      - "{{ volname }}"
+      - "{{ volname2 }}"
+      account_id: "{{ id }}"
+    tags:
+    - schedule-create
+
+#update an existing snapshot schedule task
+  - name: Update Snapshot schedule
+    na_elementsw_snapshot_schedule:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      recurring: yes
+      retention: 336
+      name: Schedule_A
+      schedule_type: TimeIntervalFrequency
+      time_interval_days: 1
+      starting_date: '2020-09-01T00:00:00Z'
+      volumes:
+      - "{{ volname }}"
+      - "{{ volname2 }}"
+      account_id: "{{ id }}"
+    tags:
+    - schedule-update
+
+#delete the snapshot schedule which has the name of Schedule_A
+  - name: Delete Snapshot schedule
+    na_elementsw_snapshot_schedule:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: absent
+      name: Schedule_A
+    tags:
+    - schedule-delete
+
+#restore a snapshot to a volume task
+  - name: Restore snapshot to volume
+    na_elementsw_snapshot_restore:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      account_id: "{{ id }}"
+      src_snapshot_id: "{{ snapid }}"
+      src_volume_id: "{{ volname }}"
+      dest_volume_name: dest-volume-area
+    tags:
+    - restore-snap-to-vol
+
+#create solidfire account for CHAP authentication or reporting
+  - name: Create Account
+    na_elementsw_account:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      element_username: "{{ account_name }}"
+    tags:
+    - create-account
+
+  - name: Rename Account
+    na_elementsw_account:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      element_username: "{{ account_name_new }}"
+      from_name: "{{ account_name }}"
+    tags:
+    - rename-account
+
+  - name: Delete Account
+    na_elementsw_account:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: absent
+      element_username: "{{ account_name_new }}"
+    tags:
+    - delete-account
+
+#create access groups to allow access to volumes from a host using their IQNs
+  - name: Create Access Group
+    na_elementsw_access_group:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      name: AnsibleAccessGroup
+      volumes: [135,136]
+      account_id: 5
+    tags:
+    - create-access-group
+
+  - name: Modify Access Group
+    na_elementsw_access_group:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      name: AnsibleAccessGroup-Renamed
+      account_id: 5
+      attributes: {"volumes": [135,136]}
+    tags:
+    - modify-access-group
+
+  - name: Rename Access Group
+    na_elementsw_access_group:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      from_name: AnsibleAccessGroup
+      name: AnsibleAccessGroup-Renamed
+    tags:
+    - rename-access-group
+
+  - name: Delete Access Group
+    na_elementsw_access_group:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: absent
+      name: 5
+    tags:
+    - delete-access-group
+
+
+#operations to add or remove a node to a cluster
+  - name: Add node from pending to active cluster
+    na_elementsw_node:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      node_id: "{{ nodeid }}"
+    tags:
+    - element-node-add
+
+  - name: Remove active node from cluster
+    na_elementsw_node:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: absent
+      node_id: "{{ nodeid }}"
+    tags:
+    - element-node-remove
+
+#after adding a node to the cluster you also need to add the drives to the cluster. You can add them individually or all at once
+#here i am docuenting to add all available drives for the specified nodeid to the cluster
+  - name: Add all the drives of a node to cluster
+    na_elementsw_drive:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      force_during_upgrade: false
+      force_during_bin_sync: false
+      node_id: "{{ nodeid }}"
+    tags:
+    - element-drive-add

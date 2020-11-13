@@ -1,0 +1,19 @@
+---
+- hosts: localhost
+  vars_files:
+  - 'sfsecrets.yml'
+  
+  vars:
+   volname: ansiblevol1
+
+  tasks:
+  - name: Create Snapshot
+    na_elementsw_snapshot:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      src_volume_id: "{{ volname }}"
+      account_id: 1
+      name: ansible-snap1
+
