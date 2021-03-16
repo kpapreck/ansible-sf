@@ -1,0 +1,39 @@
+---
+- hosts: localhost
+  vars_files:
+  - '.secrets.yml'
+
+  collections:
+    - netapp.elementsw
+    - community.vmware
+
+
+
+  vars:
+    datacenter_name: ansibledc
+    cluster_name: ansiblecluster
+    account_name: ansibleacct
+    min: 1000
+    max: 5000
+    burst: 50000
+    volsize: 1024
+    volname: ansiblevolkp
+
+
+
+
+  tasks:
+  - name: create SolidFire account_id
+    na_elementsw_account:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      element_username: "{{ account_name }}"
+    register: account
+    tags:
+    - sfadd
+  #- debug: msg=" {{ account }}"
+
+  - name: print output
+    debug: msg=" account is {{ account }}"

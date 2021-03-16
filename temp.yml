@@ -1,0 +1,28 @@
+---
+- hosts: localhost
+  vars_files:
+  - '.secrets.yml'
+
+  collections:
+    - netapp.elementsw
+    - community.vmware
+
+
+
+  vars:
+    datacenter_name: ansibledc
+    cluster_name: ansiblecluster
+
+
+  tasks:
+  - name: Add a dynamic target to iSCSI config of ESXi
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      iscsi_config:
+        vmhba_name: vmhba64
+        send_target:
+          address: "{{ send_target_address }}"
+      state: present

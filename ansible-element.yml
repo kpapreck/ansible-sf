@@ -2,7 +2,7 @@
 - hosts: localhost
   vars_files:
   - 'sfsecrets.yml'
-  
+
   collections:
     - netapp.elementsw
 
@@ -120,7 +120,7 @@
     - update-qos-policy
 
 #update QoS Policy to specificed QoS policy back to 5k, 200k, 200k
-  - name: Update SolidFire QoS Policy to 5K min, 200K max, 200K burst 
+  - name: Update SolidFire QoS Policy to 5K min, 200K max, 200K burst
     na_elementsw_qos_policy:
       hostname: "{{ elementsw_hostname }}"
       username: "{{ elementsw_username }}"
@@ -159,7 +159,7 @@
 
 #clone a volume. This will use the source volume ID being the volume name and optionally can have a source snapshot ID, which I am using here.
   - name: Clone SolidFire Volume
-    na_elementsw_volume_clone:      
+    na_elementsw_volume_clone:
       hostname: "{{ elementsw_hostname }}"
       username: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
@@ -172,7 +172,7 @@
     tags:
     - clone-vol
 
-#create a snapshot schedule with 1 or more volumes. This will create a consistant snapshot schedule (consistency group) across a number of volumes. 
+#create a snapshot schedule with 1 or more volumes. This will create a consistant snapshot schedule (consistency group) across a number of volumes.
 #In this example, I am calling 2 volumes to be a part of the snapshot schedule
   - name: Create Snapshot schedule
     na_elementsw_snapshot_schedule:

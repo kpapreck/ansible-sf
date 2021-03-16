@@ -1,0 +1,324 @@
+---
+- hosts: localhost
+  vars_files:
+  - '.secrets.yml'
+
+  collections:
+    - netapp.elementsw
+    - community.vmware
+
+
+
+  vars:
+    datacenter_name: ansibledc
+    cluster_name: ansiblecluster
+    #volbase: "NetApp-HCI"
+    volbase: "{{ cluster_name }}"
+    account: "{{ volbase }}"
+    #account: "NetApp-HCI"
+    secret: "ThIsIs$eCrEt"
+    min: 1000
+    max: 5000
+    burst: 50000
+    volsize: 1024
+    volname: ansiblevolkp
+    state: absent
+    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
+    data_lun_count: 2
+    db_size_gb: "200"
+    min: "500"
+    max: "5000"
+    burst: "45000"
+    hostIQN:
+      - IQN: "iqn.1996-04.de.susetest1:01:9c83a3e15f64"
+      - IQN: "iqn.1996-04.de.susetest2:01:9c83a3e15f65"
+
+    data_volume: {volname: "{{ volbase }}-data", count: "{{ data_lun_count }}",size: "{{ db_size_gb }}"}
+
+
+
+  tasks:
+  - name: Create New Account "{{ volbase }}"
+    na_elementsw_account:
+       hostname: "{{ elementsw_hostname }}"
+       username: "{{ elementsw_username }}"
+       password: "{{ elementsw_password }}"
+       state: "{{ state }}"
+       element_username: "{{ account }}"
+       initiator_secret: "{{ secret }}"
+    when: state == "present"
+
+
+  - name: Get Account Info
+    uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      body: '{"method": "GetAccountByName","params": {"username": "{{ volbase }}"},"id": 2112}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+    register: jsonAccountResults
+
+
+  - name: Create or remove data volume
+    na_elementsw_volume:
+       hostname: "{{ elementsw_hostname }}"
+       username: "{{ elementsw_username }}"
+       password: "{{ elementsw_password }}"
+       state: "{{ state }}"
+       name: "{{ item }}"
+       qos: {minIOPS: "{{ min }}", maxIOPS: "{{ max }}", burstIOPS: "{{ burst }}"}
+       account_id: "{{ account }}"
+       size: "{{ data_volume.size }}"
+       size_unit: gb
+       enable512e: True
+    with_sequence: count={{ data_volume.count }} format={{ data_volume.volname }}%02x
+    register: volumes
+
+
+  - name: Create or remove Access group
+    na_elementsw_access_group:
+       hostname: "{{ elementsw_hostname }}"
+       username: "{{ elementsw_username }}"
+       password: "{{ elementsw_password }}"
+       state: "{{ state }}"
+       name: "{{ account }}"
+       account_id: "{{ account }}"
+    register: results
+    #when: state == "present"
+
+
+  - name: Get Access group ID
+    uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      body: '{"method": "ListVolumeAccessGroups","params": {} ,"id": 2112}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+    register: jsonVolAccResults
+
+  - name: Set Volume Access Groups ID
+    set_fact:
+       VolAccGrpID: "{{ item.volumeAccessGroupID }}"
+    with_items: "{{ jsonVolAccResults.json.result.volumeAccessGroups }}"
+    when:
+      - item.name == volbase
+
+  - name: Delete Account "{{ volbase }}"
+    na_elementsw_account:
+       hostname: "{{ elementsw_hostname }}"
+       username: "{{ elementsw_username }}"
+       password: "{{ elementsw_password }}"
+       state: "{{ state }}"
+       element_username: "{{ account }}"
+       initiator_secret: "{{ secret }}"
+    when: state == "absent"
+
+  - name: Get Account info by Name
+    uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      body: '{"method":"GetAccountByName","params": {"username": "{{ volbase }}" },"id": 9191}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+    register: jsonAccountResult
+
+  - name: Set acccount id set_fact
+    set_fact:
+       AccountID: "{{ jsonAccountResult.json.result.account.accountID }}"
+    when: state == "present"
+
+  - name: Get Volumes By Account
+    uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      body: '{"method": "ListVolumesForAccount","params": {"accountID": "{{ AccountID }}" },"id": 9191}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+    register: jsonvolResult
+    when: state == "present"
+
+  - name: Set Volume ids
+    set_fact:
+       AccountVolIDS: "{{ jsonvolResult.json.result.volumes | map(attribute='volumeID') | list }}"
+    when: state == "present"
+
+
+
+  - name: Set Volume Access Group
+    uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      body: '{"method": "AddVolumesToVolumeAccessGroup","params": {"volumeAccessGroupID": "{{ VolAccGrpID }}","volumes": {{ AccountVolIDS }} } ,"id": 2112}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+    when:
+       - state == "present"
+       - VolAccGrpID is defined
+
+  # commenting out removing access group as it doesnt check if volumes exist today
+  #- name: Remove Volume Access Group
+  #  uri:
+  #    url: "{{ sf_url }}"
+  #    method: POST
+  #    validate_certs: False
+  #    user: "{{ elementsw_username }}"
+  #    password: "{{ elementsw_password }}"
+  #    body: '{"method": "DeleteVolumeAccessGroup","params": {"volumeAccessGroupID": "{{ VolAccGrpID }}","deleteOrphanInitiators": true },"id": 2112}'
+  #    force_basic_auth: yes
+  #    status_code: 200
+  #    body_format: json
+  #    return_content: yes
+  #  when:
+  #     - state == "absent"
+  #     - VolAccGrpID is defined
+
+
+
+
+
+  - name: Login into vCenter
+    uri:
+      url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
+      force_basic_auth: yes
+      validate_certs: no
+      method: POST
+      user: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+    register: login
+
+
+  - name: Gather iSCSI configuration information of ESXi host
+    community.vmware.vmware_host_iscsi_info:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+    register: iscsi_info
+    when: state == "present"
+  #- debug: msg=" {{ iscsi_info.iscsi_properties.iscsi_name }}"
+
+
+  - name: Add Inititator to Access Group
+    uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      body: '{"method": "AddInitiatorsToVolumeAccessGroup", "params": {"volumeAccessGroupID": "{{ VolAccGrpID }}", "initiators": ["{{ iscsi_info.iscsi_properties.iscsi_name }}"]}, "id" : 2112}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+    register: jsonagupdateResults
+    #with_items: "{{ hostIQN }}"
+    when:
+       - VolAccGrpID is defined
+       - state == "present"
+
+  - name: Add a dynamic target to iSCSI config of ESXi
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      iscsi_config:
+        vmhba_name: vmhba64
+        send_target:
+          address: "{{ send_target_address }}"
+    when: state == "present"
+
+  - name: Recan HBA's for a given ESXi host and refresh storage system objects
+    community.vmware.vmware_host_scanhba:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      refresh_storage: true
+    delegate_to: localhost
+    when: state == "present"
+
+
+
+
+  - name: Create Datacenter
+    community.vmware.vmware_datacenter:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter_name: '{{ datacenter_name }}'
+      state: "{{ state }}"
+    delegate_to: localhost
+    register: datacenter_create_result
+    when: state == "present"
+
+
+
+  - name: Create Cluster with additional changes
+    community.vmware.vmware_cluster:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      datacenter_name: "{{ datacenter_name }}"
+      cluster_name: "{{ cluster_name }}"
+      #enable_ha: True
+      #ha_vm_monitoring: vmMonitoringOnly
+      #enable_drs: True
+      #drs_default_vm_behavior: fullyAutomated
+      #enable_vsan: False
+    register: cl_result
+    delegate_to: localhost
+    when: state == "present"
+
+
+
+  - name: Delete Cluster
+    community.vmware.vmware_cluster:
+       hostname: "{{ vcenter_hostname }}"
+       username: "{{ vcenter_username }}"
+       password: "{{ vcenter_password }}"
+       datacenter_name: "{{ datacenter_name }}"
+       cluster_name: cluster
+       enable_ha: true
+       enable_drs: true
+       enable_vsan: true
+       state: absent
+    delegate_to: localhost
+    when: state == "absent"
+
+
+  - name: Delete Datacenter
+    community.vmware.vmware_datacenter:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter_name: '{{ datacenter_name }}'
+      state: absent
+    delegate_to: localhost
+    register: datacenter_delete_result
+    when: state == "absent"
