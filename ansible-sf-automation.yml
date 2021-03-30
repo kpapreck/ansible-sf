@@ -12,10 +12,10 @@
   vars:
     datacenter_name: ansibledc
     cluster_name: ansiblecluster
-    #volbase: "NetApp-HCI"
-    volbase: "{{ cluster_name }}"
-    account: "{{ volbase }}"
-    #account: "NetApp-HCI"
+    volbase: "NetApp-HCI"
+    #volbase: "{{ cluster_name }}"
+    #account: "{{ volbase }}"
+    account: "{{ cluster_name }}"
     secret: "ThIsIs$eCrEt"
     min: 1000
     max: 5000
@@ -25,9 +25,6 @@
     item: "{{ volname }}"
     state: present
     sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
-    min: "500"
-    max: "5000"
-    burst: "45000"
     hostIQN:
       - IQN: "iqn.1996-04.de.susetest1:01:9c83a3e15f64"
       - IQN: "iqn.1996-04.de.susetest2:01:9c83a3e15f65"
@@ -35,7 +32,17 @@
 
 
   tasks:
-  - name: Create New Account "{{ volbase }}"
+  - name: Login into vCenter
+    uri:
+      url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
+      force_basic_auth: yes
+      validate_certs: no
+      method: POST
+      user: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+    register: login
+
+  - name: Create New Account "{{ account }}"
     na_elementsw_account:
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
@@ -53,7 +60,7 @@
       validate_certs: False
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
-      body: '{"method": "GetAccountByName","params": {"username": "{{ volbase }}"},"id": 2112}'
+      body: '{"method": "GetAccountByName","params": {"username": "{{ account }}"},"id": 2112}'
       force_basic_auth: yes
       status_code: 200
       body_format: json
@@ -63,6 +70,16 @@
       account_id={{jsonAccountResults.json.result.account.accountID}}
       VolsInAcc={{jsonAccountResults.json.result.account.volumes}}
 
+
+  - name: Unmount VMFS datastores to ESXi
+    vmware_host_datastore:
+      hostname: '{{ esxi_hostname }}'
+      username: '{{ esxi_username }}'
+      password: '{{ esxi_password }}'
+      datastore_name: '{{ volname }}'
+      state: "{{ state }}"
+    delegate_to: localhost
+    when: state == "absent"
 
   - name: Create or remove data volume
     na_elementsw_volume:
@@ -106,7 +123,7 @@
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
        state: "{{ state }}"
-       name: "{{ account }}"
+       name: "{{ volbase }}"
        account_id: "{{ account }}"
     register: results
     when: state == "present"
@@ -141,14 +158,14 @@
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
        state: "{{ state }}"
-       name: "{{ account }}"
+       name: "{{ volbase }}"
        account_id: "{{ account }}"
     register: results
     when:
       - state == "absent"
       - VolsInAccGrp | length == 0
 
-  - name: Delete Account "{{ volbase }}"
+  - name: Delete Account "{{ account }}"
     na_elementsw_account:
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
@@ -167,7 +184,7 @@
       validate_certs: False
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
-      body: '{"method":"GetAccountByName","params": {"username": "{{ volbase }}" },"id": 9191}'
+      body: '{"method":"GetAccountByName","params": {"username": "{{ account }}" },"id": 9191}'
       force_basic_auth: yes
       status_code: 200
       body_format: json
@@ -229,15 +246,6 @@
 
 
 
-  - name: Login into vCenter
-    uri:
-      url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
-      force_basic_auth: yes
-      validate_certs: no
-      method: POST
-      user: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-    register: login
 
 
   - name: Gather iSCSI configuration information of ESXi host
@@ -333,8 +341,9 @@
       vmfs_device_name: 'naa.{{ volscsiID[0] }}'
       vmfs_version: 6
       esxi_hostname: '{{ esxi_hostname }}'
-      state: present
+      state: "{{ state }}"
     delegate_to: localhost
+    when: state == "present"
 
   - name: Delete Cluster
     community.vmware.vmware_cluster:
