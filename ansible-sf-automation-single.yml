@@ -238,14 +238,6 @@
 
 
 
-  #- name: Gather iSCSI configuration information of ESXi host
-  #  community.vmware.vmware_host_iscsi_info:
-  #    hostname: "{{ vcenter_hostname }}"
-  ##    password: "{{ vcenter_password }}"
-    #  esxi_hostname: "{{ esxi_hostname }}"
-    #register: iscsi_info
-    #when: state == "present"
-  #- debug: msg=" {{ iscsi_info.iscsi_properties.iscsi_name }}"
 
 
   - name: Gather iSCSI configuration information of ESXi host
@@ -253,8 +245,7 @@
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
-      esxi_hostname: "{{ item }}"
-    loop: "{{ esxi_hostnames }}"
+      esxi_hostname: "{{ esxi_hostname }}"
     register: iscsi_info
     when: state == "present"
   #- debug: msg=" {{ iscsi_info.iscsi_properties.iscsi_name }}"
