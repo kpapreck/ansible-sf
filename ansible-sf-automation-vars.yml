@@ -23,6 +23,12 @@
     vswitch1_uplink1: vmnic4
     vswitch1_uplink2: vmnic6
 
+    #for testing only
+    vswitch2_uplink1: vmnic0
+    vswitch2_uplink2: vmnic1
+    vswitch1_uplink1: vmnic0
+    vswitch1_uplink2: vmnic1
+
     iscsia_ip: 10.45.91.217
     iscsib_ip: 10.45.91.218
     vmotion_ip: 10.45.89.191
@@ -33,7 +39,7 @@
 
 #SolidFire variables
     #volbase is the AccessGroup Name
-    volbase: "NetApp-HCI"
+    volbase: "ansible-cluster"
     account: "{{ cluster_name }}"
     secret: "ThIsIs$eCrEt"
     min: 1000
@@ -41,8 +47,8 @@
     burst: 50000
     volsize: 1024
     volname: ansiblevolkp
-    item: "{{ volname }}"
-    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
+
+
     hostIQN:
       - IQN: "iqn.1996-04.de.susetest1:01:9c83a3e15f64"
       - IQN: "iqn.1996-04.de.susetest2:01:9c83a3e15f65"

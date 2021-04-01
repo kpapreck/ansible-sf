@@ -2,7 +2,7 @@
 - hosts: localhost
   vars_files:
   - '.secrets.yml'
-  - 'ansible-sf-automation-add-host.yml'
+  - 'ansible-sf-automation-vars.yml'
 
   collections:
     - netapp.elementsw
@@ -11,12 +11,25 @@
 
 
   vars:
-    state: present
-    #runtasks: definedifuncommented
-    #create_destroy_dc_cluster: definedifuncommented
-    #add_additional_mannagement: definedifuncommented
-    #sixnics: definedifuncommented_uncomment_if_you_have_6_nics enabled to add VMkerenel port binding
+    #for 6 cables, these should be vSwitch1 and vSwitch2, for testing I am using just vSwitch0 for everything
+    vm_vswitch: vSwitch0
+    iscsi_vswitch: vSwitch0
+    #vm_vswitch: vSwitch1
+    #iscsi_vswitch: vSwitch2
 
+
+    state: present
+
+    #runtasks and create_destroy_dc_cluster are used to allow me to easily run specific tasks for troubleshooting. comment it out to not run these tasks
+    runtasks: definedifuncommented
+    create_destroy_dc_cluster: definedifuncommented
+
+    #add_additional_management is commented out to not run it. If you want to add an additional management port group remove the #
+    #add_additional_mannagement: definedifuncommented
+
+    #sixnics is commented out as I do not have a 6-cable config. If you have 6 x nics to test, leave this uncommented by removing the #
+    #sixnics: definedifuncommented_uncomment_if_you_have_6_nics enabled to add VMkerenel port binding
+    #rescan: uncomment_if_you_want_a_rescan
 
 
   tasks:
@@ -215,13 +228,13 @@
       - state == "present"
       - runtasks is defined
 
-  - name: Add or remove iSCSI-A port group to vSwitch2
+  - name: Add or remove iSCSI-A port group to {{ iscsi_vswitch }}
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      switch: vSwitch2
+      switch: "{{ iscsi_vswitch }}"
       portgroup: "{{ iscsia_portgroup_name }}"
       vlan_id: "{{ iscsi_vlan_id }}"
       validate_certs: no
@@ -234,10 +247,8 @@
         network_failure_detection: link_status_only
         notify_switches: true
         failback: true
-        #active_adapters:
-        #    - "{{ vswitch2_uplink2 }}"
-        #unused_adapters:
-    #        - "{{ vswitch2_uplink1 }}"
+        active_adapters:
+            - "{{ vswitch2_uplink2 }}"
     register: teaming_result
     delegate_to: localhost
     when:
@@ -250,7 +261,7 @@
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      vswitch_name: vSwitch2
+      vswitch_name: "{{ iscsi_vswitch }}"
       portgroup_name: '{{ iscsia_portgroup_name }}'
       mtu: 9000
       network:
@@ -264,13 +275,13 @@
       - runtasks is defined
 
 
-  - name: Add or remove iSCSI-B port group to vSwitch2
+  - name: Add or remove iSCSI-B port group to {{ iscsi_vswitch }}
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      switch: vSwitch2
+      switch: "{{ iscsi_vswitch }}"
       portgroup: "{{ iscsib_portgroup_name }}"
       vlan_id: "{{ iscsi_vlan_id }}"
       validate_certs: no
@@ -283,10 +294,8 @@
         network_failure_detection: link_status_only
         notify_switches: true
         failback: true
-        #active_adapters:
-        #    - "{{ vswitch2_uplink1 }}"
-        #unused_adapters:
-    #        - "{{ vswitch2_uplink2 }}"
+        active_adapters:
+          - "{{ vswitch2_uplink1 }}"
     register: teaming_result
     delegate_to: localhost
     when:
@@ -299,7 +308,7 @@
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      vswitch_name: vSwitch2
+      vswitch_name: "{{ iscsi_vswitch }}"
       portgroup_name: '{{ iscsib_portgroup_name }}'
       mtu: 9000
       network:
@@ -313,13 +322,13 @@
       - runtasks is defined
 
 
-  - name: Add or remove vMotion port group to vSwitch1
+  - name: Add or remove vMotion port group to {{ vm_vswitch }}
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      switch: vSwitch1
+      switch: "{{ vm_vswitch }}"
       portgroup: "{{ vMotion_portgroup_name }}"
       vlan_id: "{{ vMotion_vlan_id }}"
       validate_certs: no
@@ -336,9 +345,9 @@
         network_failure_detection: link_status_only
         notify_switches: true
         failback: true
-        #active_adapters:
-        #    - "{{ vswitch1_uplink2 }}"
-        #    - "{{ vswitch1_uplink1 }}"
+        active_adapters:
+          - "{{ vswitch1_uplink2 }}"
+          - "{{ vswitch1_uplink1 }}"
     register: teaming_result
     delegate_to: localhost
     when:
@@ -350,7 +359,7 @@
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      vswitch_name: vSwitch1
+      vswitch_name: "{{ vm_vswitch }}"
       portgroup_name: '{{ vMotion_portgroup_name }}'
       mtu: 9000
       enable_vmotion: yes
@@ -386,15 +395,14 @@
       state: present
     when:
       - state == "present"
-      - sixnics is defined
 
-  - name: Remove VMware vSwitch2 on {{ esxi_hostname }}
+  - name: Remove VMware {{ iscsi_vswitch }}on {{ esxi_hostname }}
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      switch_name: vSwitch2
+      switch_name: "{{ iscsi_vswitch }}"
       #nics:
       #  - vmnic3
       #  - vmnic4
@@ -433,7 +441,6 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
 
 
   - name: Delete Cluster

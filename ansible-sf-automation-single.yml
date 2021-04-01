@@ -2,7 +2,7 @@
 - hosts: localhost
   vars_files:
   - '.secrets.yml'
-  - 'ansible-sf-automation-add-host.yml'
+  - 'ansible-sf-automation-vars.yml'
 
   collections:
     - netapp.elementsw
@@ -11,24 +11,11 @@
 
 
   vars:
-    datacenter_name: ansibledc
-    cluster_name: ansiblecluster
-    volbase: "NetApp-HCI"
-    #volbase: "{{ cluster_name }}"
-    #account: "{{ volbase }}"
-    account: "{{ cluster_name }}"
-    secret: "ThIsIs$eCrEt"
-    min: 1000
-    max: 5000
-    burst: 50000
-    volsize: 1024
-    volname: ansiblevolkp
+    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
     item: "{{ volname }}"
     state: present
-    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
-    hostIQN:
-      - IQN: "iqn.1996-04.de.susetest1:01:9c83a3e15f64"
-      - IQN: "iqn.1996-04.de.susetest2:01:9c83a3e15f65"
+    #runtasks: uncomment_to_run_these_tasks
+
 
 
 
@@ -304,7 +291,9 @@
       state: "{{ state }}"
     delegate_to: localhost
     register: datacenter_create_result
-    when: state == "present"
+    when:
+      - state == "present"
+      - runtasks is defined
 
 
 
@@ -322,7 +311,9 @@
       #enable_vsan: False
     register: cl_result
     delegate_to: localhost
-    when: state == "present"
+    when:
+      - state == "present"
+      - runtasks is defined
 
   - name: Mount VMFS datastores to ESXi
     vmware_host_datastore:
@@ -350,7 +341,9 @@
        enable_vsan: true
        state: absent
     delegate_to: localhost
-    when: state == "absent"
+    when:
+      - state == "absent"
+      - runtasks is defined
 
 
   - name: Delete Datacenter
@@ -362,4 +355,6 @@
       state: absent
     delegate_to: localhost
     register: datacenter_delete_result
-    when: state == "absent"
+    when:
+      - state == "absent"
+      - runtasks is defined
