@@ -1,0 +1,48 @@
+
+
+#VMware vCenter variables
+    datacenter_name: ansibledc
+    cluster_name: ansiblecluster
+
+    management_portgroup_name: "Management Network 89"
+    management_vlan_id: 89
+
+    vMotion_portgroup_name: "vMotion"
+    vMotion_vlan_id: 89
+
+    VM_network_portgroup_name: "VM_Network"
+    VM_network_vlan_id: 89
+
+    iscsia_portgroup_name: "iSCSI-A"
+    iscsib_portgroup_name: "iCSSI-B"
+    iscsi_vlan_id: 91
+
+#ESXi host specific variables
+    vswitch2_uplink1: vmnic3
+    vswitch2_uplink2: vmnic5
+    vswitch1_uplink1: vmnic4
+    vswitch1_uplink2: vmnic6
+
+    iscsia_ip: 10.45.91.217
+    iscsib_ip: 10.45.91.218
+    vmotion_ip: 10.45.89.191
+    iscsi_subnet: 255.255.255.0
+    vmotion_subnet: 255.255.255.0
+
+    vmhba: vmhba64
+
+#SolidFire variables
+    #volbase is the AccessGroup Name
+    volbase: "NetApp-HCI"
+    account: "{{ cluster_name }}"
+    secret: "ThIsIs$eCrEt"
+    min: 1000
+    max: 5000
+    burst: 50000
+    volsize: 1024
+    volname: ansiblevolkp
+    item: "{{ volname }}"
+    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
+    hostIQN:
+      - IQN: "iqn.1996-04.de.susetest1:01:9c83a3e15f64"
+      - IQN: "iqn.1996-04.de.susetest2:01:9c83a3e15f65"
