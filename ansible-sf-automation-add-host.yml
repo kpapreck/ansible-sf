@@ -1,0 +1,342 @@
+---
+- hosts: localhost
+  vars_files:
+  - '.secrets.yml'
+
+  collections:
+    - netapp.elementsw
+    - community.vmware
+
+
+
+  vars:
+    datacenter_name: ansibledc
+    cluster_name: ansiblecluster
+    volbase: "NetApp-HCI"
+    #volbase: "{{ cluster_name }}"
+    #account: "{{ volbase }}"
+    account: "{{ cluster_name }}"
+    secret: "ThIsIs$eCrEt"
+    min: 1000
+    max: 5000
+    burst: 50000
+    volsize: 1024
+    volname: ansiblevolkp
+    item: "{{ volname }}"
+    state: present
+    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
+    hostIQN:
+      - IQN: "iqn.1996-04.de.susetest1:01:9c83a3e15f64"
+      - IQN: "iqn.1996-04.de.susetest2:01:9c83a3e15f65"
+    management_portgroup_name: "Management Network 89"
+    management_vlan_id: 89
+    vMotion_portgroup_name: "vMotion"
+    vMotion_vlan_id: 89
+    VM_network_portgroup_name: "VM_Network"
+    VM_network_vlan_id: 89
+    iscsia_portgroup_name: "iSCSI-A"
+    iscsib_portgroup_name: "iCSSI-B"
+    iscsi_vlan_id: 91
+    #create_destroy_dc_cluster: definedifuncommented
+
+
+
+
+  tasks:
+  - name: Login into vCenter
+    uri:
+      url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
+      force_basic_auth: yes
+      validate_certs: no
+      method: POST
+      user: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+    register: login
+
+
+
+  - name: Create Datacenter
+    community.vmware.vmware_datacenter:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter_name: '{{ datacenter_name }}'
+      state: "{{ state }}"
+    delegate_to: localhost
+    register: datacenter_create_result
+    when:
+      - state == "present"
+      - create_destroy_dc_cluster is defined
+
+
+
+  - name: Create Cluster with additional changes
+    community.vmware.vmware_cluster:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      datacenter_name: "{{ datacenter_name }}"
+      cluster_name: "{{ cluster_name }}"
+      #enable_ha: True
+      #ha_vm_monitoring: vmMonitoringOnly
+      #enable_drs: True
+      #drs_default_vm_behavior: fullyAutomated
+      #enable_vsan: False
+    register: cl_result
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - create_destroy_dc_cluster is defined
+
+
+  - name: Add ESXi Host to vCenter
+    community.vmware.vmware_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      esxi_username: '{{ esxi_username }}'
+      esxi_password: '{{ esxi_password }}'
+      validate_certs: no
+      state: "{{ state }}"
+    delegate_to: localhost
+    when: state == "present"
+
+
+  - name: Add 2nd NIC to vSwitch0
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: vSwitch0
+      nics:
+        - vmnic0
+        - vmnic1
+      mtu: 1500
+      validate_certs: no
+    delegate_to: localhost
+    when: state == "present"
+
+  - name: Remove VM Network from vSwitch0
+    community.vmware.vmware_portgroup:
+      hostname: "{{ esxi_hostname }}"
+      username: "{{ esxi_username }}"
+      password: "{{ esxi_password }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch0
+      portgroup: "VM Network"
+      state: absent
+    delegate_to: localhost
+    when: state == "present"
+
+  - name: Remove Management Network VM Portgroup from vSwitch0
+    community.vmware.vmware_portgroup:
+      hostname: "{{ esxi_hostname }}"
+      username: "{{ esxi_username }}"
+      password: "{{ esxi_password }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch0
+      portgroup: "{{ management_portgroup_name }}"
+      vlan_id: "{{ management_vlan_id }}"
+      state: absent
+    delegate_to: localhost
+
+    # Pause until you can verify updates to an application were successful.
+  #- pause:
+
+  #starting to add tasks
+
+  - name: Add Management Network VM Portgroup
+    community.vmware.vmware_portgroup:
+      hostname: "{{ esxi_hostname }}"
+      username: "{{ esxi_username }}"
+      password: "{{ esxi_password }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch0
+      portgroup: "{{ management_portgroup_name }}"
+      vlan_id: "{{ management_vlan_id }}"
+    delegate_to: localhost
+    when: state == "present"
+
+  - name: Add VMware vSwitch1 on {{ esxi_hostname }}
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: vSwitch1
+      #nics:
+      #  - vmnic2
+      #  - vmnic3
+      mtu: 9000
+      validate_certs: no
+    delegate_to: localhost
+    when: state == "present"
+
+  - name: Add or remove VM_Network port group to vSwitch1 on {{ esxi_hostname }}
+    community.vmware.vmware_portgroup:
+      hostname: "{{ esxi_hostname }}"
+      username: "{{ esxi_username }}"
+      password: "{{ esxi_password }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch1
+      portgroup: "{{ VM_network_portgroup_name }}"
+      vlan_id: "{{ VM_network_vlan_id }}"
+    delegate_to: localhost
+    #when: state == "present"
+
+  - name: Add or remove vMotion port group to vSwitch1 on {{ esxi_hostname }}
+    community.vmware.vmware_portgroup:
+      hostname: "{{ esxi_hostname }}"
+      username: "{{ esxi_username }}"
+      password: "{{ esxi_password }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch1
+      portgroup: "{{ vMotion_portgroup_name }}"
+      vlan_id: "{{ vMotion_vlan_id }}"
+    delegate_to: localhost
+    #when: state == "present"
+
+  - name: Remove VMware vSwitch1 on {{ esxi_hostname }}
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: vSwitch1
+      #nics:
+      #  - vmnic2
+      #  - vmnic3
+      mtu: 9000
+      validate_certs: no
+    delegate_to: localhost
+    when: state == "absent"
+
+  - name: Add VMware vSwitch2 on {{ esxi_hostname }}
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: vSwitch2
+      #nics:
+      #  - vmnic3
+      #  - vmnic4
+      mtu: 9000
+      validate_certs: no
+    delegate_to: localhost
+    when: state == "present"
+
+  - name: Add or remove iSCSI-A port group to vSwitch2 on {{ esxi_hostname }}
+    community.vmware.vmware_portgroup:
+      hostname: "{{ esxi_hostname }}"
+      username: "{{ esxi_username }}"
+      password: "{{ esxi_password }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch2
+      portgroup: "{{ iscsia_portgroup_name }}"
+      vlan_id: "{{ iscsi_vlan_id }}"
+    delegate_to: localhost
+    #when: state == "present"
+
+  - name: Add or remove iSCSI-B port group to vSwitch2 on {{ esxi_hostname }}
+    community.vmware.vmware_portgroup:
+      hostname: "{{ esxi_hostname }}"
+      username: "{{ esxi_username }}"
+      password: "{{ esxi_password }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch2
+      portgroup: "{{ iscsib_portgroup_name }}"
+      vlan_id: "{{ iscsi_vlan_id }}"
+    delegate_to: localhost
+    #when: state == "present"
+
+  - name: Remove VMware vSwitch2 on {{ esxi_hostname }}
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: vSwitch2
+      #nics:
+      #  - vmnic3
+      #  - vmnic4
+      mtu: 9000
+      validate_certs: no
+    delegate_to: localhost
+    when: state == "absent"
+
+  - name: Remove {{ esxi_hostname }} from vCenter
+    community.vmware.vmware_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      esxi_username: '{{ esxi_username }}'
+      esxi_password: '{{ esxi_password }}'
+      validate_certs: no
+      state: "{{ state }}"
+    delegate_to: localhost
+    when: state == "absent"
+
+
+  - name: Rescan HBA's for a given ESXi host and refresh storage system objects
+    community.vmware.vmware_host_scanhba:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      refresh_storage: true
+    delegate_to: localhost
+    when: state == "present"
+
+
+
+  - name: Mount VMFS datastores to ESXi
+    vmware_host_datastore:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datastore_name: '{{ volname }}'
+      datastore_type: 'vmfs'
+      vmfs_device_name: 'naa.{{ volscsiID[0] }}'
+      vmfs_version: 6
+      esxi_hostname: '{{ esxi_hostname }}'
+      state: "{{ state }}"
+    delegate_to: localhost
+    when: state == "present"
+
+  - name: Delete Cluster
+    community.vmware.vmware_cluster:
+       hostname: "{{ vcenter_hostname }}"
+       username: "{{ vcenter_username }}"
+       password: "{{ vcenter_password }}"
+       datacenter_name: "{{ datacenter_name }}"
+       cluster_name: cluster
+       enable_ha: true
+       enable_drs: true
+       enable_vsan: true
+       state: absent
+    delegate_to: localhost
+    when:
+      - state == "absent"
+      - create_destroy_dc_cluster is defined
+
+
+  - name: Delete Datacenter
+    community.vmware.vmware_datacenter:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter_name: '{{ datacenter_name }}'
+      state: absent
+    delegate_to: localhost
+    register: datacenter_delete_result
+    when:
+      - state == "absent"
+      - create_destroy_dc_cluster is defined

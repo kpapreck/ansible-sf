@@ -1,0 +1,188 @@
+---
+- hosts: localhost
+  vars_files:
+  - '.secrets.yml'
+
+  collections:
+    - netapp.elementsw
+    - community.vmware
+
+
+
+  vars:
+    datacenter_name: ansibledc
+    cluster_name: ansiblecluster
+    volbase: "NetApp-HCI"
+    #volbase: "{{ cluster_name }}"
+    #account: "{{ volbase }}"
+    account: "{{ cluster_name }}"
+    secret: "ThIsIs$eCrEt"
+    min: 1000
+    max: 5000
+    burst: 50000
+    volsize: 1024
+    volname: ansiblevolkp
+    item: "{{ volname }}"
+    state: present
+    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
+    hostIQN:
+      - IQN: "iqn.1996-04.de.susetest1:01:9c83a3e15f64"
+      - IQN: "iqn.1996-04.de.susetest2:01:9c83a3e15f65"
+
+
+
+  tasks:
+  - name: Login into vCenter
+    uri:
+      url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
+      force_basic_auth: yes
+      validate_certs: no
+      method: POST
+      user: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+    register: login
+
+
+
+
+  - name: Gather iSCSI configuration information of ESXi host
+    community.vmware.vmware_host_iscsi_info:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ item }}"
+    loop: "{{ esxi_hostnames }}"
+    register: iscsi_info
+    when: state == "present"
+  #- debug: msg=" {{ iscsi_info.iscsi_properties.iscsi_name }}"
+
+
+  - name: Add Inititator to Access Group
+    uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      body: '{"method": "AddInitiatorsToVolumeAccessGroup", "params": {"volumeAccessGroupID": "{{ VolAccGrpID }}", "initiators": ["{{ iscsi_info.iscsi_properties.iscsi_name }}"]}, "id" : 2112}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+    register: jsonagupdateResults
+    #with_items: "{{ hostIQN }}"
+    when:
+       - VolAccGrpID is defined
+       - state == "present"
+
+  - name: Add a dynamic target to iSCSI config of ESXi
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      iscsi_config:
+        vmhba_name: vmhba64
+        send_target:
+          address: "{{ send_target_address }}"
+    when: state == "present"
+
+  - name: Rescan HBA's for a given ESXi host and refresh storage system objects
+    community.vmware.vmware_host_scanhba:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      refresh_storage: true
+    delegate_to: localhost
+    when: state == "present"
+
+
+
+
+  - name: Create Datacenter
+    community.vmware.vmware_datacenter:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter_name: '{{ datacenter_name }}'
+      state: "{{ state }}"
+    delegate_to: localhost
+    register: datacenter_create_result
+    when: state == "present"
+
+
+
+  - name: Create Cluster with additional changes
+    community.vmware.vmware_cluster:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      datacenter_name: "{{ datacenter_name }}"
+      cluster_name: "{{ cluster_name }}"
+      #enable_ha: True
+      #ha_vm_monitoring: vmMonitoringOnly
+      #enable_drs: True
+      #drs_default_vm_behavior: fullyAutomated
+      #enable_vsan: False
+    register: cl_result
+    delegate_to: localhost
+    when: state == "present"
+
+  - name: Add or Remove ESXi Host to vCenter
+    community.vmware.vmware_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      esxi_username: '{{ esxi_username }}'
+      esxi_password: '{{ esxi_password }}'
+      validate_certs: no
+    state: "{{ state }}"
+    delegate_to: localhost
+
+
+
+
+
+  - name: Mount VMFS datastores to ESXi
+    vmware_host_datastore:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datastore_name: '{{ volname }}'
+      datastore_type: 'vmfs'
+      vmfs_device_name: 'naa.{{ volscsiID[0] }}'
+      vmfs_version: 6
+      esxi_hostname: '{{ esxi_hostname }}'
+      state: "{{ state }}"
+    delegate_to: localhost
+    when: state == "present"
+
+  - name: Delete Cluster
+    community.vmware.vmware_cluster:
+       hostname: "{{ vcenter_hostname }}"
+       username: "{{ vcenter_username }}"
+       password: "{{ vcenter_password }}"
+       datacenter_name: "{{ datacenter_name }}"
+       cluster_name: cluster
+       enable_ha: true
+       enable_drs: true
+       enable_vsan: true
+       state: absent
+    delegate_to: localhost
+    when: state == "absent"
+
+
+  - name: Delete Datacenter
+    community.vmware.vmware_datacenter:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter_name: '{{ datacenter_name }}'
+      state: absent
+    delegate_to: localhost
+    register: datacenter_delete_result
+    when: state == "absent"

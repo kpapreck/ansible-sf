@@ -332,6 +332,24 @@
     delegate_to: localhost
     when: state == "present"
 
+  - name: Add or Remove ESXi Host to vCenter
+    community.vmware.vmware_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      esxi_username: '{{ esxi_username }}'
+      esxi_password: '{{ esxi_password }}'
+      validate_certs: no
+    state: "{{ state }}"
+    delegate_to: localhost
+
+
+
+
+
   - name: Mount VMFS datastores to ESXi
     vmware_host_datastore:
       hostname: '{{ vcenter_hostname }}'
