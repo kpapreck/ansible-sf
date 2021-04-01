@@ -69,7 +69,20 @@
   - set_fact:
       account_id={{jsonAccountResults.json.result.account.accountID}}
       VolsInAcc={{jsonAccountResults.json.result.account.volumes}}
+<<<<<<< HEAD
 
+=======
+>>>>>>> 09620ee26efd4364e53e05d7ac185660502bd155
+
+  - name: Unmount VMFS datastores to ESXi
+    vmware_host_datastore:
+      hostname: '{{ esxi_hostname }}'
+      username: '{{ esxi_username }}'
+      password: '{{ esxi_password }}'
+      datastore_name: '{{ volname }}'
+      state: "{{ state }}"
+    delegate_to: localhost
+    when: state == "absent"
 
   - name: Unmount VMFS datastores to ESXi
     vmware_host_datastore:
@@ -95,6 +108,7 @@
        enable512e: True
     register: volumes
   - debug: msg="vol name is {{ volname }}"
+<<<<<<< HEAD
 
 
   - name: get volume SCSI ID
@@ -116,6 +130,29 @@
     when: state == "present"
 
 
+=======
+
+
+  - name: get volume SCSI ID
+    uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      body: '{"method": "ListVolumes","params": {"volumeName": "{{ volname }}", "volumeStatus": "active" },"id": 1}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+    register: volResults
+  - set_fact:
+      volscsiID: "{{ volResults.json.result.volumes | map(attribute='scsiNAADeviceID') | list }}"
+  - debug: msg="vol scsi ID is {{ volscsiID[0] }}"
+    when: state == "present"
+
+
+>>>>>>> 09620ee26efd4364e53e05d7ac185660502bd155
 
   - name: Create Access group
     na_elementsw_access_group:
@@ -332,6 +369,7 @@
     delegate_to: localhost
     when: state == "present"
 
+<<<<<<< HEAD
   - name: Add or Remove ESXi Host to vCenter
     community.vmware.vmware_host:
       hostname: '{{ vcenter_hostname }}'
@@ -348,6 +386,21 @@
 
 
 
+=======
+  - name: Mount VMFS datastores to ESXi
+    vmware_host_datastore:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datastore_name: '{{ volname }}'
+      datastore_type: 'vmfs'
+      vmfs_device_name: 'naa.{{ volscsiID[0] }}'
+      vmfs_version: 6
+      esxi_hostname: '{{ esxi_hostname }}'
+      state: "{{ state }}"
+    delegate_to: localhost
+    when: state == "present"
+>>>>>>> 09620ee26efd4364e53e05d7ac185660502bd155
 
 
   - name: Mount VMFS datastores to ESXi
