@@ -107,7 +107,7 @@
       nics:
         - vmnic0
         - vmnic1
-      mtu: 1500
+      mtu: 9000
       validate_certs: no
     delegate_to: localhost
     when:
@@ -266,6 +266,7 @@
       mtu: 9000
       network:
         type: 'static'
+        default_gateway: "{{ iscsi_gateway }}"
         ip_address: '{{ iscsia_ip }}'
         subnet_mask: '{{ iscsi_subnet }}'
       state: present
@@ -313,6 +314,7 @@
       mtu: 9000
       network:
         type: 'static'
+        default_gateway: "{{ iscsi_gateway }}"
         ip_address: '{{ iscsib_ip }}'
         subnet_mask: '{{ iscsi_subnet }}'
       state: present
@@ -365,6 +367,7 @@
       enable_vmotion: yes
       network:
         type: 'static'
+        default_gateway: "{{ vmotion_gateway }}"
         ip_address: '{{ vmotion_ip }}'
         subnet_mask: '{{ vmotion_subnet }}'
       state: '{{ state }}'
@@ -396,7 +399,7 @@
     when:
       - state == "present"
 
-  - name: Remove VMware {{ iscsi_vswitch }}on {{ esxi_hostname }}
+  - name: Remove VMware {{ iscsi_vswitch }} on {{ esxi_hostname }}
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'

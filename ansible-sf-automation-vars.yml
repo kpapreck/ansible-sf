@@ -31,9 +31,12 @@
 
     iscsia_ip: 10.45.91.217
     iscsib_ip: 10.45.91.218
-    vmotion_ip: 10.45.89.191
+    iscsi_gateway: 10.45.91.1
     iscsi_subnet: 255.255.255.0
+
+    vmotion_ip: 10.45.89.191
     vmotion_subnet: 255.255.255.0
+    vmotion_gateway: 10.45.89.1
 
     vmhba: vmhba64
 

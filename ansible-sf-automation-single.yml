@@ -267,7 +267,8 @@
         vmhba_name: vmhba64
         send_target:
           address: "{{ send_target_address }}"
-    when: state == "present"
+      state: "{{ state }}"
+    #when: state == "present"
 
   - name: Rescan HBA's for a given ESXi host and refresh storage system objects
     community.vmware.vmware_host_scanhba:
