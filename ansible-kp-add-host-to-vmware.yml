@@ -2,7 +2,7 @@
 - hosts: localhost
   vars_files:
   - '.secrets.yml'
-  - 'ansible-sf-automation-vars.yml'
+  - 'ansible-kp-automation-vars.yml'
 
   collections:
     - netapp.elementsw
@@ -95,7 +95,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-
+  #- pause:
 
   - name: Add 2nd NIC to vSwitch0
     community.vmware.vmware_vswitch:
@@ -186,8 +186,9 @@
       switch: "{{ vm_vswitch }}"
       portgroup: "{{ VM_network_portgroup_name }}"
       vlan_id: "{{ VM_network_vlan_id }}"
+      state: "{{ state }}"
     delegate_to: localhost
-    when:
+
 
 
   - name: Remove VMware vSwitch1 on {{ esxi_hostname }}
@@ -202,6 +203,7 @@
         - '{{ vswitch1_uplink2 | default(vmnic3) }}'
       mtu: 9000
       validate_certs: "{{ validate_vm_certs | default(no) }}"
+      state: absent
     delegate_to: localhost
     when:
       - state == "absent"
@@ -225,8 +227,49 @@
       - state == "present"
       - number_of_host_uplinks == 6
 
+  - name: Delete iSCSI-A vmkernel port
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      vswitch_name: "{{ iscsi_vswitch }}"
+      portgroup_name: '{{ iscsia_portgroup_name }}'
+      device: vmk1
+      state: "{{ state }}"
+    delegate_to: localhost
+    when:
+      - state == "absent"
 
-  - name: Add or remove iSCSI-A port group to {{ iscsi_vswitch }}
+  - name: Delete iSCSI-B vmkernel port
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      vswitch_name: "{{ iscsi_vswitch }}"
+      portgroup_name: '{{ iscsib_portgroup_name }}'
+      device: vmk2
+      state: "{{ state }}"
+    delegate_to: localhost
+    when:
+      - state == "absent"
+
+  - name: Delete vMotion vmkernel port
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      vswitch_name: "{{ iscsi_vswitch }}"
+      portgroup_name: '{{ iscsib_portgroup_name }}'
+      device: vmk3
+      state: "{{ state }}"
+    delegate_to: localhost
+    when:
+      - state == "absent"
+
+  - name: Add or Remove iSCSI-A port group to {{ iscsi_vswitch }}
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -236,6 +279,7 @@
       portgroup: "{{ iscsia_portgroup_name }}"
       vlan_id: "{{ iscsi_vlan_id }}"
       validate_certs: "{{ validate_vm_certs | default(no) }}"
+      state: "{{ state }}"
       security:
         promiscuous_mode: False
         mac_changes: False
@@ -249,7 +293,6 @@
             - "{{ vswitch2_uplink2 }}"
     register: teaming_result
     delegate_to: localhost
-
 
 
   - name: Add iSCSI-A vmkernel port using static network type
@@ -266,7 +309,7 @@
         default_gateway: "{{ iscsi_gateway }}"
         ip_address: '{{ iscsia_ip }}'
         subnet_mask: '{{ iscsi_subnet }}'
-      state: present
+      state: "{{ state }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -294,9 +337,9 @@
         failback: true
         active_adapters:
           - "{{ vswitch2_uplink1 }}"
+      state: "{{ state }}"
     register: teaming_result
     delegate_to: localhost
-    when:
 
 
 
@@ -314,7 +357,7 @@
         default_gateway: "{{ iscsi_gateway }}"
         ip_address: '{{ iscsib_ip }}'
         subnet_mask: '{{ iscsi_subnet }}'
-      state: present
+      state: "{{ state }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -347,9 +390,9 @@
         active_adapters:
           - "{{ vswitch1_uplink2 }}"
           - "{{ vswitch1_uplink1 }}"
+      state: "{{ state }}"
     register: teaming_result
     delegate_to: localhost
-    when:
 
 
   - name: Add vMotion vmkernel port using static network type
@@ -396,6 +439,9 @@
     when:
       - state == "present"
 
+  #- pause:
+
+
   - name: Remove VMware {{ iscsi_vswitch }} on {{ esxi_hostname }}
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
@@ -411,6 +457,8 @@
     delegate_to: localhost
     when:
       - state == "absent"
+      - iscsi_vswitch != "vSwitch0"
+
 
 
   - name: Remove {{ esxi_hostname }} from vCenter
@@ -443,21 +491,22 @@
       - state == "present"
 
 
-  - name: Delete Cluster
-    community.vmware.vmware_cluster:
-       hostname: "{{ vcenter_hostname }}"
-       username: "{{ vcenter_username }}"
-       password: "{{ vcenter_password }}"
-       datacenter_name: "{{ datacenter_name }}"
-       cluster_name: cluster
-       enable_ha: true
-       enable_drs: true
-       enable_vsan: true
-       state: absent
-    delegate_to: localhost
-    when:
-      - state == "absent"
-      - DESTRUCTION_MODE is defined
+  #- name: Delete Cluster
+  #  community.vmware.vmware_cluster:
+  #     hostname: "{{ vcenter_hostname }}"
+  #     username: "{{ vcenter_username }}"
+  #     password: "{{ vcenter_password }}"
+  #     datacenter_name: "{{ datacenter_name }}"
+  #     cluster_name: cluster
+  #     enable_ha: true
+  #     enable_drs: true
+  #     enable_vsan: true
+  #     state: absent
+  #  delegate_to: localhost
+  #  when:
+  #    - state == "absent"
+  #    - DESTRUCTION_MODE is defined
+
 
 
 

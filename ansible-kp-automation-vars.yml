@@ -7,7 +7,7 @@
 
     #uncomment if you want to add an additional management port group to vSwitch0
     #management_portgroup_name: HCI_Management_Port_Group
-    #management_vlan_id: 
+    #management_vlan_id:
 
     vMotion_portgroup_name: "vMotion"
     vMotion_vlan_id: 89
@@ -16,12 +16,12 @@
     VM_network_vlan_id: 89
 
     iscsia_portgroup_name: "iSCSI-A"
-    iscsib_portgroup_name: "iCSSI-B"
+    iscsib_portgroup_name: "iSCSI-B"
     iscsi_vlan_id: 91
 
 # WARNING: DESTRUCTION_MODE is for TEST ENVIRONMENTS ONLY. This will destroy a cluster/datacenter and remove ESXi hosts..
 # WARNING: state:absent will remove a ESXi host from vCenter. Only use this on ESXi hosts for test environments
-    #DESTRUCTION_MODE: AllowDestruction_of_VMware_Datacenter_Cluster
+    #DESTRUCTION_MODE: AllowDestruction_of_VMware_Datacenter_Cluster and removal of iSCSI target
 
 # ESXi host Networking Requirements from ESXi hostname as defined in .secrets.yml file
 # 2-cable or 6-cable setup
@@ -37,7 +37,9 @@
     vmotion_subnet: 255.255.255.0
     vmotion_gateway: 10.45.89.1
 
+#vmhba may be vmhba64 or vmhba65
     vmhba: vmhba64
+
 
 #2-cable or 6-cable VSS variables for ESXi Host
     vswitch0_uplink1: vmnic0
@@ -64,7 +66,7 @@
     volname: ansiblevolkp1
 
     #optional QoS settings, otherwise will use 1000/15000/100000 and 2TB
-    #min: 1000
+    min: 500
     #max: 15000
     #burst: 100000
     #volsize: 2048

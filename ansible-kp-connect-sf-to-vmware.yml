@@ -2,7 +2,7 @@
 - hosts: localhost
   vars_files:
   - '.secrets.yml'
-  - 'ansible-sf-automation-vars.yml'
+  - 'ansible-kp-automation-vars.yml'
 
   collections:
     - netapp.elementsw
@@ -36,7 +36,7 @@
     register: accountstatus
     when:
       - state == "present"
-      
+
 
   - name: Get Account Info
     uri:
@@ -191,7 +191,7 @@
        - state == "present"
        - VolAccGrpID is defined
 
-  - pause:
+  #- pause:
 
   - name: Gather iSCSI configuration information of ESXi host
     community.vmware.vmware_host_iscsi_info:
@@ -233,6 +233,7 @@
         send_target:
           address: "{{ send_target_address }}"
       state: "{{ state | default(present) }}"
+      when: DESTRUCTION_MODE is defined
 
   - name: Rescan HBA's for a given ESXi host and refresh storage system objects
     community.vmware.vmware_host_scanhba:
