@@ -49,7 +49,7 @@
     max: 5000
     burst: 50000
     volsize: 1024
-    volname: ansiblevolkp2
+    volname: ansiblevolkp4
 
 
     hostIQN:

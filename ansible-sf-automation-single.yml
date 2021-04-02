@@ -29,6 +29,7 @@
       user: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
     register: login
+    when: runtasks is defined
 
   - name: Create New Account "{{ account }}"
     na_elementsw_account:
@@ -38,7 +39,9 @@
        state: "{{ state }}"
        element_username: "{{ account }}"
        initiator_secret: "{{ secret }}"
-    when: state == "present"
+    when:
+      - state == "present"
+      - runtasks is defined
 
 
   - name: Get Account Info
@@ -85,7 +88,7 @@
   - debug: msg="vol name is {{ volname }}"
 
 
-  - name: get volume SCSI ID
+  - name: get volume ID and SCSI ID
     uri:
       url: "{{ sf_url }}"
       method: POST
@@ -100,7 +103,8 @@
     register: volResults
   - set_fact:
       volscsiID: "{{ volResults.json.result.volumes | map(attribute='scsiNAADeviceID') | list }}"
-  - debug: msg="vol scsi ID is {{ volscsiID[0] }}"
+      volID: "{{ volResults.json.result.volumes | map(attribute='volumeID') | list }}"
+  - debug: msg="vol scsi ID is {{ volscsiID[0] }} and volID is {{ volID }}"
     when: state == "present"
 
 
@@ -131,6 +135,8 @@
       return_content: yes
     register: jsonVolAccResults
 
+
+#only working IF no other volumes reside in here
   - name: Set Volume Access Groups ID
     set_fact:
        VolAccGrpID: "{{ item.volumeAccessGroupID }}"
@@ -140,6 +146,10 @@
       label: "working on: {{ item.name }}"
     when:
       - item.name == volbase
+  #- debug: msg="vols in the access group right now are {{ VolsInAccGrp }}"
+
+
+
 
 
   - name: Remove Access group
@@ -182,6 +192,8 @@
     register: jsonAccountResult
     when: state == "present"
 
+
+
   - name: Set acccount id set_fact
     set_fact:
        AccountID: "{{ jsonAccountResult.json.result.account.accountID }}"
@@ -202,10 +214,14 @@
     register: jsonvolResult
     when: state == "present"
 
+
   - name: Set Volume ids
     set_fact:
        AccountVolIDS: "{{ jsonvolResult.json.result.volumes | map(attribute='volumeID') | list }}"
     when: state == "present"
+
+
+  - pause:
 
 
   - name: Set Volume Access Group
@@ -215,7 +231,7 @@
       validate_certs: False
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
-      body: '{"method": "AddVolumesToVolumeAccessGroup","params": {"volumeAccessGroupID": "{{ VolAccGrpID }}","volumes": {{ AccountVolIDS }} } ,"id": 2112}'
+      body: '{"method": "AddVolumesToVolumeAccessGroup","params": {"volumeAccessGroupID": "{{ VolAccGrpID }}","volumes": {{ volID }} } ,"id": 2112}'
       force_basic_auth: yes
       status_code: 200
       body_format: json
@@ -223,6 +239,9 @@
     when:
        - state == "present"
        - VolAccGrpID is defined
+
+
+  - pause:
 
 
 

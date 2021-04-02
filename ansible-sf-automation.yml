@@ -2,6 +2,7 @@
 - hosts: localhost
   vars_files:
   - '.secrets.yml'
+  - 'ansible-sf-automation-vars.yml'
 
   collections:
     - netapp.elementsw
@@ -10,24 +11,10 @@
 
 
   vars:
-    datacenter_name: ansibledc
-    cluster_name: ansiblecluster
-    volbase: "NetApp-HCI"
-    #volbase: "{{ cluster_name }}"
-    #account: "{{ volbase }}"
-    account: "{{ cluster_name }}"
-    secret: "ThIsIs$eCrEt"
-    min: 1000
-    max: 5000
-    burst: 50000
-    volsize: 1024
-    volname: ansiblevolkp
     item: "{{ volname }}"
     state: present
     sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
-    hostIQN:
-      - IQN: "iqn.1996-04.de.susetest1:01:9c83a3e15f64"
-      - IQN: "iqn.1996-04.de.susetest2:01:9c83a3e15f65"
+
 
 
 
@@ -69,10 +56,10 @@
   - set_fact:
       account_id={{jsonAccountResults.json.result.account.accountID}}
       VolsInAcc={{jsonAccountResults.json.result.account.volumes}}
-<<<<<<< HEAD
+#<<<<<<< HEAD
 
-=======
->>>>>>> 09620ee26efd4364e53e05d7ac185660502bd155
+#=======
+#>>>>>>> 09620ee26efd4364e53e05d7ac185660502bd155
 
   - name: Unmount VMFS datastores to ESXi
     vmware_host_datastore:
@@ -108,7 +95,7 @@
        enable512e: True
     register: volumes
   - debug: msg="vol name is {{ volname }}"
-<<<<<<< HEAD
+#<<<<<<< HEAD
 
 
   - name: get volume SCSI ID
@@ -130,7 +117,7 @@
     when: state == "present"
 
 
-=======
+#=======
 
 
   - name: get volume SCSI ID
@@ -152,7 +139,7 @@
     when: state == "present"
 
 
->>>>>>> 09620ee26efd4364e53e05d7ac185660502bd155
+#>>>>>>> 09620ee26efd4364e53e05d7ac185660502bd155
 
   - name: Create Access group
     na_elementsw_access_group:
@@ -369,7 +356,7 @@
     delegate_to: localhost
     when: state == "present"
 
-<<<<<<< HEAD
+#<<<<<<< HEAD
   - name: Add or Remove ESXi Host to vCenter
     community.vmware.vmware_host:
       hostname: '{{ vcenter_hostname }}'
@@ -386,7 +373,7 @@
 
 
 
-=======
+#=======
   - name: Mount VMFS datastores to ESXi
     vmware_host_datastore:
       hostname: '{{ vcenter_hostname }}'
@@ -400,7 +387,7 @@
       state: "{{ state }}"
     delegate_to: localhost
     when: state == "present"
->>>>>>> 09620ee26efd4364e53e05d7ac185660502bd155
+#>>>>>>> 09620ee26efd4364e53e05d7ac185660502bd155
 
 
   - name: Mount VMFS datastores to ESXi
