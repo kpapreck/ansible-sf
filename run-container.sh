@@ -1,1 +1,1 @@
-docker run -it --rm -v $(pwd):/root/scripts kpapreck/ansible-sf-vm-svl
+docker run -it --rm -v $(pwd):/scripts kpapreck/ansible-sf-vm-svl

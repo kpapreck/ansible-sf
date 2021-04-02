@@ -11,28 +11,29 @@
 
 
   vars:
-    #for 6 cables, these should be vSwitch1 and vSwitch2, for testing I am using just vSwitch0 for everything
-    vm_vswitch: vSwitch0
-    iscsi_vswitch: vSwitch0
-    #vm_vswitch: vSwitch1
-    #iscsi_vswitch: vSwitch2
-
-
     state: present
 
-    #runtasks and create_destroy_dc_cluster are used to allow me to easily run specific tasks for troubleshooting. comment it out to not run these tasks
-    #runtasks: definedifuncommented
-    #create_destroy_dc_cluster: definedifuncommented
-
-    #add_additional_management is commented out to not run it. If you want to add an additional management port group remove the #
-    #add_additional_mannagement: definedifuncommented
-
-    #sixnics is commented out as I do not have a 6-cable config. If you have 6 x nics to test, leave this uncommented by removing the #
-    #sixnics: definedifuncommented_uncomment_if_you_have_6_nics enabled to add VMkerenel port binding
-    #rescan: uncomment_if_you_want_a_rescan
 
 
   tasks:
+  - name: Define additional vSwitch variables if using 2-cable VSS
+    set_fact:
+      vm_vswitch: vSwitch0
+      iscsi_vswitch: vSwitch0
+      vswitch2_uplink1: "{{ vswitch0_uplink1 }}"
+      vswitch2_uplink2: "{{ vswitch0_uplink2 }}"
+      vswitch1_uplink1: "{{ vswitch0_uplink1 }}"
+      vswitch1_uplink2: "{{ vswitch0_uplink2 }}"
+    when: number_of_host_uplinks == 2
+
+  - name: Define additional vSwitch variables if using 6-cable VSS
+    set_fact:
+      vm_vswitch: vSwitch1
+      iscsi_vswitch: vSwitch2
+    when: number_of_host_uplinks == 6
+
+
+
   - name: Login into vCenter
     uri:
       url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
@@ -95,6 +96,7 @@
     when:
       - state == "present"
 
+
   - name: Add 2nd NIC to vSwitch0
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
@@ -103,8 +105,8 @@
       esxi_hostname: '{{ esxi_hostname }}'
       switch_name: vSwitch0
       nics:
-        - vmnic0
-        - vmnic1
+        - '{{ vswitch0_uplink1 }}'
+        - '{{ vswitch0_uplink2 }}'
       mtu: 9000
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
@@ -126,6 +128,7 @@
       - state == "present"
 
 
+
   - name: Remove Management Network VM Portgroup from vSwitch0
     community.vmware.vmware_portgroup:
       hostname: "{{ esxi_hostname }}"
@@ -138,12 +141,9 @@
       state: absent
     delegate_to: localhost
     when:
+      - management_portgroup_name is defined
 
 
-    # Pause until you can verify updates to an application were successful.
-  #- pause:
-
-  #starting to add tasks
 
   - name: Add Management Network VM Portgroup
     community.vmware.vmware_portgroup:
@@ -157,8 +157,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-
-      - add_additional_mannagement is defined
+      - management_portgroup_name is defined
 
   - name: Add VMware vSwitch1 on {{ esxi_hostname }}
     community.vmware.vmware_vswitch:
@@ -167,29 +166,28 @@
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
       switch_name: vSwitch1
-      #nics:
-      #  - '{{ vswitch1_uplink1 }}'
-      #  - '{{ vswitch1_uplink2 }}'
+      nics:
+        - '{{ vswitch1_uplink1 | default(vmnic2) }}'
+        - '{{ vswitch1_uplink2 | default(vmnic3) }}'
       mtu: 9000
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
+      - number_of_host_uplinks == 6
 
 
-  - name: Add or remove VM_Network port group to vSwitch1 on {{ esxi_hostname }}
+  - name: Add or remove VM_Network port group to {{ vm_vswitch }} on {{ esxi_hostname }}
     community.vmware.vmware_portgroup:
       hostname: "{{ esxi_hostname }}"
       username: "{{ esxi_username }}"
       password: "{{ esxi_password }}"
       esxi_hostname: '{{ esxi_hostname }}'
-      switch: vSwitch1
+      switch: "{{ vm_vswitch }}"
       portgroup: "{{ VM_network_portgroup_name }}"
       vlan_id: "{{ VM_network_vlan_id }}"
     delegate_to: localhost
     when:
-
-    #when: state == "present"
 
 
   - name: Remove VMware vSwitch1 on {{ esxi_hostname }}
@@ -199,14 +197,15 @@
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
       switch_name: vSwitch1
-      #nics:
-      #  - '{{ vswitch2_uplink1 }}'
-      #  - '{{ vswitch2_uplink2 }}'
+      nics:
+        - '{{ vswitch1_uplink1 | default(vmnic2) }}'
+        - '{{ vswitch1_uplink2 | default(vmnic3) }}'
       mtu: 9000
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
+      - number_of_host_uplinks == 6
 
 
   - name: Add VMware vSwitch2 on {{ esxi_hostname }}
@@ -216,14 +215,15 @@
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
       switch_name: vSwitch2
-      #nics:
-      #  - vmnic3
-      #  - vmnic4
+      nics:
+        - '{{ vswitch2_uplink1 | default(vmnic4) }}'
+        - '{{ vswitch2_uplink2 | default(vmnic5) }}'
       mtu: 9000
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
+      - number_of_host_uplinks == 6
 
 
   - name: Add or remove iSCSI-A port group to {{ iscsi_vswitch }}
@@ -249,7 +249,6 @@
             - "{{ vswitch2_uplink2 }}"
     register: teaming_result
     delegate_to: localhost
-    when:
 
 
 
@@ -462,15 +461,15 @@
 
 
 
-  - name: Delete Datacenter
-    community.vmware.vmware_datacenter:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      datacenter_name: '{{ datacenter_name }}'
-      state: absent
-    delegate_to: localhost
-    register: datacenter_delete_result
-    when:
-      - state == "absent"
-      - DESTRUCTION_MODE is defined
+  #- name: Delete Datacenter
+  #  community.vmware.vmware_datacenter:
+  #    hostname: '{{ vcenter_hostname }}'
+  #    username: '{{ vcenter_username }}'
+  #    password: '{{ vcenter_password }}'
+  #    datacenter_name: '{{ datacenter_name }}'
+  #    state: absent
+  #  delegate_to: localhost
+  #  register: datacenter_delete_result
+  #  when:
+  #    - state == "absent"
+  #    - DESTRUCTION_MODE is defined
