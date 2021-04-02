@@ -8,8 +8,6 @@
     - netapp.elementsw
     - community.vmware
 
-
-
   vars:
     sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
     item: "{{ volname }}"
@@ -28,18 +26,17 @@
     register: login
 
 
-  - name: Create New Account "{{ account }}"
+  - name: Create New Account
     na_elementsw_account:
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
        state: "{{ state | default(present) }}"
        element_username: "{{ account }}"
-       initiator_secret: "{{ secret }}"
+    register: accountstatus
     when:
       - state == "present"
-  #- pause:
-
+      
 
   - name: Get Account Info
     uri:
@@ -54,13 +51,16 @@
       body_format: json
       return_content: yes
     register: jsonAccountResults
+  #- debug: msg="results printed are {{ jsonAccountResults.json }}"
+
 
   - name: Set account ID variable and the volumes that reside within the account
     set_fact:
       account_id={{jsonAccountResults.json.result.account.accountID}}
       VolsInAcc={{jsonAccountResults.json.result.account.volumes}}
     when:
-      account_id is defined
+      - jsonAccountResults.json.error is not defined
+
 
 
   - name: Unmount VMFS datastores to ESXi
@@ -80,9 +80,9 @@
        password: "{{ elementsw_password }}"
        state: "{{ state | default(present) }}"
        name: "{{ item }}"
-       qos: {minIOPS: "{{ min }}", maxIOPS: "{{ max }}", burstIOPS: "{{ burst }}"}
+       qos: {minIOPS: "{{ min | default(1000) }}", maxIOPS: "{{ max | default(10000) }}", burstIOPS: "{{ burst | default(100000) }}"}
        account_id: "{{ account }}"
-       size: "{{ volsize }}"
+       size: "{{ volsize | default(2048) }}"
        size_unit: gb
        enable512e: True
     register: volumes
@@ -116,7 +116,7 @@
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
        state: "{{ state | default(present) }}"
-       name: "{{ volbase }}"
+       name: "{{ accessgroup }}"
        account_id: "{{ account }}"
     register: results
     when: state == "present"
@@ -137,7 +137,7 @@
     register: jsonVolAccResults
 
 
-  - name: Set Volume Access Groups ID for  "{{ volbase }}"
+  - name: Set Volume Access Groups ID for  "{{ accessgroup }}"
     set_fact:
        VolAccGrpID: "{{ item.volumeAccessGroupID }}"
        VolsInAccGrp: "{{ item.volumes }}"
@@ -145,21 +145,23 @@
     loop_control:
       label: "working on: {{ item.name }}"
     when:
-      - item.name == volbase
+      - item.name == accessgroup
 
 
-  - name: Remove Access Group "{{volbase }}" if empty
+
+  - name: Remove Access Group "{{accessgroup }}" if empty
     na_elementsw_access_group:
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
        state: "{{ state | default(present) }}"
-       name: "{{ volbase }}"
+       name: "{{ accessgroup }}"
        account_id: "{{ account }}"
     register: results
     when:
       - state == "absent"
       - VolsInAccGrp | length == 0
+
 
   - name: Delete Account "{{ account }}" if empty
     na_elementsw_account:
@@ -168,7 +170,6 @@
        password: "{{ elementsw_password }}"
        state: "{{ state | default(present) }}"
        element_username: "{{ account }}"
-       initiator_secret: "{{ secret }}"
     when:
       - state == "absent"
       - VolsInAcc | length == 0
@@ -190,6 +191,7 @@
        - state == "present"
        - VolAccGrpID is defined
 
+  - pause:
 
   - name: Gather iSCSI configuration information of ESXi host
     community.vmware.vmware_host_iscsi_info:
@@ -241,7 +243,6 @@
       refresh_storage: true
     delegate_to: localhost
     when: state == "present"
-
 
 
   - name: Mount VMFS datastores to ESXi

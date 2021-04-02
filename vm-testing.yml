@@ -1,0 +1,28 @@
+
+
+- hosts: localhost
+  vars_files:
+  - '.secrets.yml'
+  - 'ansible-sf-automation-vars.yml'
+
+  collections:
+    - netapp.elementsw
+    - community.vmware
+
+  vars:
+    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
+    item: "{{ volname }}"
+    state: present
+
+
+
+  tasks:
+  - name: Login into vCenter
+    uri:
+      url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
+      force_basic_auth: yes
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      method: POST
+      user: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+    register: login

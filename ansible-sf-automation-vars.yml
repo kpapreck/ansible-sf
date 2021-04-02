@@ -18,6 +18,11 @@
     iscsib_portgroup_name: "iCSSI-B"
     iscsi_vlan_id: 91
 
+# WARNING
+# DESTRUCTION_MODE is for TEST ENVIRONMENTS ONLY. This will destroy a cluster/datacenter and remove ESXi hosts..
+    DESTRUCTION_MODE: AllowDestruction_of_VMware_Datacenter_Cluster
+
+
 #ESXi host specific variables
     vswitch2_uplink1: vmnic3
     vswitch2_uplink2: vmnic5
@@ -42,13 +47,11 @@
     vmhba: vmhba64
 
 #SolidFire variables
-    #volbase is the AccessGroup Name
     validate_sf_certs: "False"
-    volbase: "ansible-cluster"
+    accessgroup: "ansible-cluster"
     account: "{{ cluster_name }}"
-    secret: "ThIsIs$eCrEt"
-    min: 1000
-    max: 5000
-    burst: 50000
-    volsize: 1024
+    #min: 1000
+    #max: 15000
+    #burst: 100000
+    #volsize: 2048
     volname: ansiblevolkp1

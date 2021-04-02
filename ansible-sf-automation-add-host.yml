@@ -22,7 +22,7 @@
 
     #runtasks and create_destroy_dc_cluster are used to allow me to easily run specific tasks for troubleshooting. comment it out to not run these tasks
     #runtasks: definedifuncommented
-    create_destroy_dc_cluster: definedifuncommented
+    #create_destroy_dc_cluster: definedifuncommented
 
     #add_additional_management is commented out to not run it. If you want to add an additional management port group remove the #
     #add_additional_mannagement: definedifuncommented
@@ -56,7 +56,7 @@
     register: datacenter_create_result
     when:
       - state == "present"
-      - create_destroy_dc_cluster is defined
+
 
 
 
@@ -76,7 +76,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - create_destroy_dc_cluster is defined
+
 
 
   - name: Add ESXi Host to vCenter
@@ -94,8 +94,6 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
-
 
   - name: Add 2nd NIC to vSwitch0
     community.vmware.vmware_vswitch:
@@ -112,7 +110,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
+
 
   - name: Remove VM Network from vSwitch0
     community.vmware.vmware_portgroup:
@@ -126,7 +124,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
+
 
   - name: Remove Management Network VM Portgroup from vSwitch0
     community.vmware.vmware_portgroup:
@@ -140,7 +138,7 @@
       state: absent
     delegate_to: localhost
     when:
-      - runtasks is defined
+
 
     # Pause until you can verify updates to an application were successful.
   #- pause:
@@ -159,7 +157,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
+
       - add_additional_mannagement is defined
 
   - name: Add VMware vSwitch1 on {{ esxi_hostname }}
@@ -177,7 +175,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
+
 
   - name: Add or remove VM_Network port group to vSwitch1 on {{ esxi_hostname }}
     community.vmware.vmware_portgroup:
@@ -190,7 +188,7 @@
       vlan_id: "{{ VM_network_vlan_id }}"
     delegate_to: localhost
     when:
-      - runtasks is defined
+
     #when: state == "present"
 
 
@@ -209,7 +207,7 @@
     delegate_to: localhost
     when:
       - state == "absent"
-      - runtasks is defined
+
 
   - name: Add VMware vSwitch2 on {{ esxi_hostname }}
     community.vmware.vmware_vswitch:
@@ -226,7 +224,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
+
 
   - name: Add or remove iSCSI-A port group to {{ iscsi_vswitch }}
     community.vmware.vmware_portgroup:
@@ -252,7 +250,7 @@
     register: teaming_result
     delegate_to: localhost
     when:
-     - runtasks is defined
+
 
 
   - name: Add iSCSI-A vmkernel port using static network type
@@ -273,7 +271,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
+
 
 
   - name: Add or remove iSCSI-B port group to {{ iscsi_vswitch }}
@@ -300,7 +298,7 @@
     register: teaming_result
     delegate_to: localhost
     when:
-      - runtasks is defined
+
 
 
   - name: Add iSCSI-B vmkernel port using static network type
@@ -321,7 +319,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
+
 
 
   - name: Add or remove vMotion port group to {{ vm_vswitch }}
@@ -353,7 +351,7 @@
     register: teaming_result
     delegate_to: localhost
     when:
-      - runtasks is defined
+
 
   - name: Add vMotion vmkernel port using static network type
     community.vmware.vmware_vmkernel:
@@ -374,7 +372,7 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runtasks is defined
+
 
   - name: Enable iSCSI on {{ esxi_hostname }}
     community.vmware.vmware_host_iscsi:
@@ -414,7 +412,7 @@
     delegate_to: localhost
     when:
       - state == "absent"
-      - runtasks is defined
+
 
   - name: Remove {{ esxi_hostname }} from vCenter
     community.vmware.vmware_host:
@@ -431,7 +429,7 @@
     delegate_to: localhost
     when:
       - state == "absent"
-      - runtasks is defined
+
 
 
   - name: Rescan HBA's for a given ESXi host and refresh storage system objects
@@ -460,7 +458,8 @@
     delegate_to: localhost
     when:
       - state == "absent"
-      - create_destroy_dc_cluster is defined
+      - DESTRUCTION_MODE is defined
+
 
 
   - name: Delete Datacenter
@@ -474,4 +473,4 @@
     register: datacenter_delete_result
     when:
       - state == "absent"
-      - create_destroy_dc_cluster is defined
+      - DESTRUCTION_MODE is defined
