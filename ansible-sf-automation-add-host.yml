@@ -37,7 +37,7 @@
     uri:
       url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
       force_basic_auth: yes
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
       method: POST
       user: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
@@ -51,7 +51,7 @@
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       datacenter_name: '{{ datacenter_name }}'
-      state: "{{ state }}"
+      state: "{{ state | default(present) }}"
     delegate_to: localhost
     register: datacenter_create_result
     when:
@@ -89,8 +89,8 @@
       esxi_hostname: '{{ esxi_hostname }}'
       esxi_username: '{{ esxi_username }}'
       esxi_password: '{{ esxi_password }}'
-      validate_certs: no
-      state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      state: "{{ state | default(present) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -108,7 +108,7 @@
         - vmnic0
         - vmnic1
       mtu: 9000
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -173,7 +173,7 @@
       #  - '{{ vswitch1_uplink1 }}'
       #  - '{{ vswitch1_uplink2 }}'
       mtu: 9000
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -205,7 +205,7 @@
       #  - '{{ vswitch2_uplink1 }}'
       #  - '{{ vswitch2_uplink2 }}'
       mtu: 9000
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
@@ -222,7 +222,7 @@
       #  - vmnic3
       #  - vmnic4
       mtu: 9000
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -237,7 +237,7 @@
       switch: "{{ iscsi_vswitch }}"
       portgroup: "{{ iscsia_portgroup_name }}"
       vlan_id: "{{ iscsi_vlan_id }}"
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
       security:
         promiscuous_mode: False
         mac_changes: False
@@ -285,7 +285,7 @@
       switch: "{{ iscsi_vswitch }}"
       portgroup: "{{ iscsib_portgroup_name }}"
       vlan_id: "{{ iscsi_vlan_id }}"
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
       security:
         promiscuous_mode: False
         mac_changes: False
@@ -333,7 +333,7 @@
       switch: "{{ vm_vswitch }}"
       portgroup: "{{ vMotion_portgroup_name }}"
       vlan_id: "{{ vMotion_vlan_id }}"
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
       security:
         promiscuous_mode: False
         mac_changes: False
@@ -370,7 +370,7 @@
         default_gateway: "{{ vmotion_gateway }}"
         ip_address: '{{ vmotion_ip }}'
         subnet_mask: '{{ vmotion_subnet }}'
-      state: '{{ state }}'
+      state: '{{ state | default(present) }}'
     delegate_to: localhost
     when:
       - state == "present"
@@ -410,7 +410,7 @@
       #  - vmnic3
       #  - vmnic4
       mtu: 9000
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
@@ -426,8 +426,8 @@
       esxi_hostname: '{{ esxi_hostname }}'
       esxi_username: '{{ esxi_username }}'
       esxi_password: '{{ esxi_password }}'
-      validate_certs: no
-      state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      state: "{{ state | default(present) }}"
     delegate_to: localhost
     when:
       - state == "absent"

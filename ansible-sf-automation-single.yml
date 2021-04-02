@@ -14,9 +14,6 @@
     sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
     item: "{{ volname }}"
     state: present
-    #runtasks: uncomment_to_run_these_tasks
-
-
 
 
   tasks:
@@ -24,31 +21,29 @@
     uri:
       url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
       force_basic_auth: yes
-      validate_certs: no
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
       method: POST
       user: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
     register: login
-    when: runtasks is defined
 
   - name: Create New Account "{{ account }}"
     na_elementsw_account:
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
-       state: "{{ state }}"
+       state: "{{ state | default(present) }}"
        element_username: "{{ account }}"
        initiator_secret: "{{ secret }}"
     when:
       - state == "present"
-      - runtasks is defined
 
 
   - name: Get Account Info
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: False
+      validate_certs: "{{ validate_vm_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "GetAccountByName","params": {"username": "{{ account }}"},"id": 2112}'
@@ -68,7 +63,7 @@
       username: '{{ esxi_username }}'
       password: '{{ esxi_password }}'
       datastore_name: '{{ volname }}'
-      state: "{{ state }}"
+      state: "{{ state | default(present) }}"
     delegate_to: localhost
     when: state == "absent"
 
@@ -77,7 +72,7 @@
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
-       state: "{{ state }}"
+       state: "{{ state | default(present) }}"
        name: "{{ item }}"
        qos: {minIOPS: "{{ min }}", maxIOPS: "{{ max }}", burstIOPS: "{{ burst }}"}
        account_id: "{{ account }}"
@@ -92,7 +87,7 @@
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: False
+      validate_certs: "{{ validate_vm_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "ListVolumes","params": {"volumeName": "{{ volname }}", "volumeStatus": "active" },"id": 1}'
@@ -108,24 +103,23 @@
     when: state == "present"
 
 
-
   - name: Create Access group
     na_elementsw_access_group:
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
-       state: "{{ state }}"
+       state: "{{ state | default(present) }}"
        name: "{{ volbase }}"
        account_id: "{{ account }}"
     register: results
     when: state == "present"
 
 
-  - name: Get Access group ID
+  - name: Get List of all Access group IDs
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: False
+      validate_certs: "{{ validate_vm_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "ListVolumeAccessGroups","params": {} ,"id": 2112}'
@@ -136,8 +130,7 @@
     register: jsonVolAccResults
 
 
-#only working IF no other volumes reside in here
-  - name: Set Volume Access Groups ID
+  - name: Set Volume Access Groups ID for  "{{ volbase }}"
     set_fact:
        VolAccGrpID: "{{ item.volumeAccessGroupID }}"
        VolsInAccGrp: "{{ item.volumes }}"
@@ -146,18 +139,14 @@
       label: "working on: {{ item.name }}"
     when:
       - item.name == volbase
-  #- debug: msg="vols in the access group right now are {{ VolsInAccGrp }}"
 
 
-
-
-
-  - name: Remove Access group
+  - name: Remove Access Group "{{volbase }}" if empty
     na_elementsw_access_group:
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
-       state: "{{ state }}"
+       state: "{{ state | default(present) }}"
        name: "{{ volbase }}"
        account_id: "{{ account }}"
     register: results
@@ -165,70 +154,25 @@
       - state == "absent"
       - VolsInAccGrp | length == 0
 
-  - name: Delete Account "{{ account }}"
+  - name: Delete Account "{{ account }}" if empty
     na_elementsw_account:
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
-       state: "{{ state }}"
+       state: "{{ state | default(present) }}"
        element_username: "{{ account }}"
        initiator_secret: "{{ secret }}"
     when:
       - state == "absent"
       - VolsInAcc | length == 0
 
-  - name: Get Account info by Name
-    uri:
-      url: "{{ sf_url }}"
-      method: POST
-      validate_certs: False
-      user: "{{ elementsw_username }}"
-      password: "{{ elementsw_password }}"
-      body: '{"method":"GetAccountByName","params": {"username": "{{ account }}" },"id": 9191}'
-      force_basic_auth: yes
-      status_code: 200
-      body_format: json
-      return_content: yes
-    register: jsonAccountResult
-    when: state == "present"
-
-
-
-  - name: Set acccount id set_fact
-    set_fact:
-       AccountID: "{{ jsonAccountResult.json.result.account.accountID }}"
-    when: state == "present"
-
-  - name: Get Volumes By Account
-    uri:
-      url: "{{ sf_url }}"
-      method: POST
-      validate_certs: False
-      user: "{{ elementsw_username }}"
-      password: "{{ elementsw_password }}"
-      body: '{"method": "ListVolumesForAccount","params": {"accountID": "{{ AccountID }}" },"id": 9191}'
-      force_basic_auth: yes
-      status_code: 200
-      body_format: json
-      return_content: yes
-    register: jsonvolResult
-    when: state == "present"
-
-
-  - name: Set Volume ids
-    set_fact:
-       AccountVolIDS: "{{ jsonvolResult.json.result.volumes | map(attribute='volumeID') | list }}"
-    when: state == "present"
-
-
-  - pause:
 
 
   - name: Set Volume Access Group
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: False
+      validate_certs: "{{ validate_vm_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "AddVolumesToVolumeAccessGroup","params": {"volumeAccessGroupID": "{{ VolAccGrpID }}","volumes": {{ volID }} } ,"id": 2112}'
@@ -262,7 +206,7 @@
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: False
+      validate_certs: "{{ validate_vm_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "AddInitiatorsToVolumeAccessGroup", "params": {"volumeAccessGroupID": "{{ VolAccGrpID }}", "initiators": ["{{ iscsi_info.iscsi_properties.iscsi_name }}"]}, "id" : 2112}'
@@ -286,7 +230,7 @@
         vmhba_name: vmhba64
         send_target:
           address: "{{ send_target_address }}"
-      state: "{{ state }}"
+      state: "{{ state | default(present) }}"
     #when: state == "present"
 
   - name: Rescan HBA's for a given ESXi host and refresh storage system objects
@@ -308,7 +252,7 @@
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       datacenter_name: '{{ datacenter_name }}'
-      state: "{{ state }}"
+      state: "{{ state | default(present) }}"
     delegate_to: localhost
     register: datacenter_create_result
     when:
@@ -345,7 +289,7 @@
       vmfs_device_name: 'naa.{{ volscsiID[0] }}'
       vmfs_version: 6
       esxi_hostname: '{{ esxi_hostname }}'
-      state: "{{ state }}"
+      state: "{{ state | default(present) }}"
     delegate_to: localhost
     when: state == "present"
 

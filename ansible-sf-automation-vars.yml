@@ -1,6 +1,7 @@
 
 
 #VMware vCenter variables
+    #validate_vm_certs: no
     datacenter_name: ansibledc
     cluster_name: ansiblecluster
 
@@ -42,6 +43,7 @@
 
 #SolidFire variables
     #volbase is the AccessGroup Name
+    #validate_sf_certs: "False"
     volbase: "ansible-cluster"
     account: "{{ cluster_name }}"
     secret: "ThIsIs$eCrEt"
@@ -49,9 +51,4 @@
     max: 5000
     burst: 50000
     volsize: 1024
-    volname: ansiblevolkp4
-
-
-    hostIQN:
-      - IQN: "iqn.1996-04.de.susetest1:01:9c83a3e15f64"
-      - IQN: "iqn.1996-04.de.susetest2:01:9c83a3e15f65"
+    volname: ansiblevolkp1
