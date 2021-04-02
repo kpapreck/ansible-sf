@@ -27,6 +27,7 @@
       password: "{{ vcenter_password }}"
     register: login
 
+
   - name: Create New Account "{{ account }}"
     na_elementsw_account:
        hostname: "{{ elementsw_hostname }}"
@@ -37,13 +38,14 @@
        initiator_secret: "{{ secret }}"
     when:
       - state == "present"
+  #- pause:
 
 
   - name: Get Account Info
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: "{{ validate_vm_certs | default(False) }}"
+      validate_certs: "{{ validate_sf_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "GetAccountByName","params": {"username": "{{ account }}"},"id": 2112}'
@@ -52,9 +54,13 @@
       body_format: json
       return_content: yes
     register: jsonAccountResults
-  - set_fact:
+
+  - name: Set account ID variable and the volumes that reside within the account
+    set_fact:
       account_id={{jsonAccountResults.json.result.account.accountID}}
       VolsInAcc={{jsonAccountResults.json.result.account.volumes}}
+    when:
+      account_id is defined
 
 
   - name: Unmount VMFS datastores to ESXi
@@ -83,11 +89,12 @@
   - debug: msg="vol name is {{ volname }}"
 
 
+
   - name: get volume ID and SCSI ID
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: "{{ validate_vm_certs | default(False) }}"
+      validate_certs: "{{ validate_sf_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "ListVolumes","params": {"volumeName": "{{ volname }}", "volumeStatus": "active" },"id": 1}'
@@ -119,7 +126,7 @@
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: "{{ validate_vm_certs | default(False) }}"
+      validate_certs: "{{ validate_sf_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "ListVolumeAccessGroups","params": {} ,"id": 2112}'
@@ -167,12 +174,11 @@
       - VolsInAcc | length == 0
 
 
-
   - name: Set Volume Access Group
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: "{{ validate_vm_certs | default(False) }}"
+      validate_certs: "{{ validate_sf_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "AddVolumesToVolumeAccessGroup","params": {"volumeAccessGroupID": "{{ VolAccGrpID }}","volumes": {{ volID }} } ,"id": 2112}'
@@ -183,12 +189,6 @@
     when:
        - state == "present"
        - VolAccGrpID is defined
-
-
-  - pause:
-
-
-
 
 
   - name: Gather iSCSI configuration information of ESXi host
@@ -206,7 +206,7 @@
     uri:
       url: "{{ sf_url }}"
       method: POST
-      validate_certs: "{{ validate_vm_certs | default(False) }}"
+      validate_certs: "{{ validate_sf_certs | default(False) }}"
       user: "{{ elementsw_username }}"
       password: "{{ elementsw_password }}"
       body: '{"method": "AddInitiatorsToVolumeAccessGroup", "params": {"volumeAccessGroupID": "{{ VolAccGrpID }}", "initiators": ["{{ iscsi_info.iscsi_properties.iscsi_name }}"]}, "id" : 2112}'
@@ -231,7 +231,6 @@
         send_target:
           address: "{{ send_target_address }}"
       state: "{{ state | default(present) }}"
-    #when: state == "present"
 
   - name: Rescan HBA's for a given ESXi host and refresh storage system objects
     community.vmware.vmware_host_scanhba:
@@ -244,40 +243,6 @@
     when: state == "present"
 
 
-
-
-  - name: Create Datacenter
-    community.vmware.vmware_datacenter:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      datacenter_name: '{{ datacenter_name }}'
-      state: "{{ state | default(present) }}"
-    delegate_to: localhost
-    register: datacenter_create_result
-    when:
-      - state == "present"
-      - runtasks is defined
-
-
-
-  - name: Create Cluster with additional changes
-    community.vmware.vmware_cluster:
-      hostname: "{{ vcenter_hostname }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      datacenter_name: "{{ datacenter_name }}"
-      cluster_name: "{{ cluster_name }}"
-      #enable_ha: True
-      #ha_vm_monitoring: vmMonitoringOnly
-      #enable_drs: True
-      #drs_default_vm_behavior: fullyAutomated
-      #enable_vsan: False
-    register: cl_result
-    delegate_to: localhost
-    when:
-      - state == "present"
-      - runtasks is defined
 
   - name: Mount VMFS datastores to ESXi
     vmware_host_datastore:
@@ -292,33 +257,3 @@
       state: "{{ state | default(present) }}"
     delegate_to: localhost
     when: state == "present"
-
-  - name: Delete Cluster
-    community.vmware.vmware_cluster:
-       hostname: "{{ vcenter_hostname }}"
-       username: "{{ vcenter_username }}"
-       password: "{{ vcenter_password }}"
-       datacenter_name: "{{ datacenter_name }}"
-       cluster_name: cluster
-       enable_ha: true
-       enable_drs: true
-       enable_vsan: true
-       state: absent
-    delegate_to: localhost
-    when:
-      - state == "absent"
-      - runtasks is defined
-
-
-  - name: Delete Datacenter
-    community.vmware.vmware_datacenter:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      datacenter_name: '{{ datacenter_name }}'
-      state: absent
-    delegate_to: localhost
-    register: datacenter_delete_result
-    when:
-      - state == "absent"
-      - runtasks is defined

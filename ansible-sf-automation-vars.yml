@@ -1,7 +1,7 @@
 
 
 #VMware vCenter variables
-    #validate_vm_certs: no
+    validate_vm_certs: no
     datacenter_name: ansibledc
     cluster_name: ansiblecluster
 
@@ -43,7 +43,7 @@
 
 #SolidFire variables
     #volbase is the AccessGroup Name
-    #validate_sf_certs: "False"
+    validate_sf_certs: "False"
     volbase: "ansible-cluster"
     account: "{{ cluster_name }}"
     secret: "ThIsIs$eCrEt"
