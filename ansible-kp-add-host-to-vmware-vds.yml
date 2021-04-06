@@ -362,7 +362,9 @@
       device: vmk3
       state: absent
     delegate_to: localhost
-    when: state == "absent"
+    when:
+      - state == "absent"
+      - runme is defined
 
   - name: Delete VMkernel port
     community.vmware.vmware_vmkernel:
@@ -376,7 +378,9 @@
       state: absent
 
     delegate_to: localhost
-    when: state == "absent"
+    when:
+      - state == "absent"
+      - runme is defined
 
   - name: Delete VMkernel port
     community.vmware.vmware_vmkernel:
@@ -389,16 +393,18 @@
       device: vmk2
       state: absent
     delegate_to: localhost
-    when: state == "absent"
+    when:
+      - state == "absent"
+      - runme is defined
 
 
-  - name: Delete dvSwitch
+  - name: Delete dvSwitch '{{ vds_name }}'
     community.vmware.vmware_dvswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       datacenter: '{{ datacenter_name }}'
-      switch: dvSwitch
+      switch: ' {{ vds_name }}'
       state: absent
     delegate_to: localhost
     when:
@@ -573,6 +579,7 @@
     delegate_to: localhost
     when:
       - state == "absent"
+      - switch_type == "vss"
 
   - name: Delete iSCSI-B vmkernel port
     community.vmware.vmware_vmkernel:
@@ -587,6 +594,7 @@
     delegate_to: localhost
     when:
       - state == "absent"
+      - switch_type == "vss"
 
   - name: Delete vMotion vmkernel port
     community.vmware.vmware_vmkernel:
@@ -601,6 +609,7 @@
     delegate_to: localhost
     when:
       - state == "absent"
+      - switch_type == "vss"
 
   - name: Add or Remove iSCSI-A port group to VSS
     community.vmware.vmware_portgroup:
