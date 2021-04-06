@@ -326,21 +326,21 @@
       - state == "absent"
       - switch_type == "vds"
 
-  - name: Remove Management Network VM Portgroup for cleanup
-    community.vmware.vmware_portgroup:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      esxi_hostname: '{{ esxi_hostname }}'
-      switch: vSwitch0
-      portgroup: "Management Network"
-      #vlan_id: "{{ vds_management_vlan_id }}"
-      state: absent
-    delegate_to: localhost
-    when:
-      - state == "absent"
-      - switch_type == "vds"
-
+  #- name: Remove Management Network VM Portgroup for cleanup
+  #  community.vmware.vmware_portgroup:
+  #    hostname: '{{ vcenter_hostname }}'
+  #    username: '{{ vcenter_username }}'
+  #    password: '{{ vcenter_password }}'
+  #    esxi_hostname: '{{ esxi_hostname }}'
+  #    switch: vSwitch0
+  #    portgroup: "Management Network"
+  #    #vlan_id: "{{ vds_management_vlan_id }}"
+  #    state: absent
+  #  delegate_to: localhost
+  #  when:
+  #    - state == "absent"
+  #    - switch_type == "vds"
+#
   - pause:
     when: state == "absent"
 
@@ -357,8 +357,9 @@
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      vswitch_name: '{{ vds_name }}'
+      dvswitch_name: '{{ vds_name }}'
       portgroup_name: '{{ vMotion_portgroup_name }}'
+      device: vmk3
       state: absent
     delegate_to: localhost
     when: state == "absent"
@@ -369,9 +370,11 @@
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      vswitch_name: '{{ vds_name }}'
+      dvswitch_name: '{{ vds_name }}'
       portgroup_name: '{{ iscsia_portgroup_name }}'
+      device: vmk1
       state: absent
+
     delegate_to: localhost
     when: state == "absent"
 
@@ -381,8 +384,9 @@
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
-      vswitch_name: '{{ vds_name }}'
+      dvswitch_name: '{{ vds_name }}'
       portgroup_name: '{{ iscsib_portgroup_name }}'
+      device: vmk2
       state: absent
     delegate_to: localhost
     when: state == "absent"
@@ -401,7 +405,6 @@
       - state == "absent"
 
 
-  - pause:
 
   - name: Remove VMware vSwitch0
     community.vmware.vmware_vswitch:
