@@ -19,27 +19,30 @@
     iscsib_portgroup_name: "iSCSI-B"
     iscsi_vlan_id: 91
 
-# WARNING: DESTRUCTION_MODE is for TEST ENVIRONMENTS ONLY. This will destroy a cluster/datacenter and remove ESXi hosts..
-# WARNING: state:absent will remove a ESXi host from vCenter. Only use this on ESXi hosts for test environments
-    #DESTRUCTION_MODE: AllowDestruction_of_VMware_Datacenter_Cluster and removal of iSCSI target
-
 # ESXi host Networking Requirements from ESXi hostname as defined in .secrets.yml file
 # 2-cable or 6-cable setup
     number_of_host_uplinks: 2
+    switch_type: "vds"
 
 # esxi_hostname: uncomment to override .secrets.yml for additional hosts
+    esxi_hostname: "10.45.89.122"
     iscsia_ip: 10.45.91.217
     iscsib_ip: 10.45.91.218
     iscsi_gateway: 10.45.91.1
     iscsi_subnet: 255.255.255.0
 
     vmotion_ip: 10.45.89.191
-    vmotion_subnet: 255.255.255.0
     vmotion_gateway: 10.45.89.1
+    vmotion_subnet: 255.255.255.0
+
 
 #vmhba may be vmhba64 or vmhba65
-    vmhba: vmhba64
+    #vmhba: vmhba64
 
+#VDS variables
+    vds_name: "NetApp Ansible VDS"
+    vds_management_portgroup_name: "Management Network"
+    vds_management_vlan_id: 89
 
 #2-cable or 6-cable VSS variables for ESXi Host
     vswitch0_uplink1: vmnic0
@@ -66,7 +69,7 @@
     volname: ansiblevolkp1
 
     #optional QoS settings, otherwise will use 1000/15000/100000 and 2TB
-    min: 500
+    #min: 500
     #max: 15000
     #burst: 100000
     #volsize: 2048

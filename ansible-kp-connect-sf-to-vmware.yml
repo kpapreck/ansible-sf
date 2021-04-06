@@ -65,10 +65,11 @@
 
   - name: Unmount VMFS datastores to ESXi
     vmware_host_datastore:
-      hostname: '{{ esxi_hostname }}'
-      username: '{{ esxi_username }}'
-      password: '{{ esxi_password }}'
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
       datastore_name: '{{ volname }}'
+      esxi_hostname: '{{ esxi_hostname }}'
       state: "{{ state | default(present) }}"
     delegate_to: localhost
     when: state == "absent"
@@ -200,8 +201,9 @@
       password: "{{ vcenter_password }}"
       esxi_hostname: "{{ esxi_hostname }}"
     register: iscsi_info
-    when: state == "present"
+    #when: state == "present"
   #- debug: msg=" {{ iscsi_info.iscsi_properties.iscsi_name }}"
+  #- debug: msg=" {{ iscsi_info.iscsi_properties.vmhba_name }}"
 
 
   - name: Add Inititator to Access Group
@@ -229,11 +231,13 @@
       password: "{{ vcenter_password }}"
       esxi_hostname: "{{ esxi_hostname }}"
       iscsi_config:
-        vmhba_name: vmhba64
+        vmhba_name: "{{ iscsi_info.iscsi_properties.vmhba_name }}"
         send_target:
           address: "{{ send_target_address }}"
-      state: "{{ state | default(present) }}"
-      when: DESTRUCTION_MODE is defined
+      state: present
+      
+
+  #- pause:
 
   - name: Rescan HBA's for a given ESXi host and refresh storage system objects
     community.vmware.vmware_host_scanhba:
