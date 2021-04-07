@@ -1,3 +1,23 @@
+######################################################################################################################
+# SolidFire variables required for connecting SolidFire to VMware #ansible-kp-connect-sf-to-vmware.yml
+######################################################################################################################
+
+    validate_sf_certs: "False"
+    accessgroup: "NetApp-HCI-Ansible-Cluster"
+    account: "{{ cluster_name }}"
+    volname: ansiblevolkp1
+
+    #optional QoS settings, otherwise will use 1000/15000/100000 and 2TB
+    #min: 500
+    #max: 15000
+    #burst: 100000
+    #volsize: 2048
+
+
+######################################################################################################################
+# VMware variables requiree for adding ESXi host to VMware #ansible-kp-add-host-to-vmware
+######################################################################################################################
+
 # VMware vCenter variables
     validate_vm_certs: no
     datacenter_name: NetApp-HCI-Datacenter-01
@@ -53,17 +73,3 @@
 # iSCSI switch uplinks for vSwitch2
     #vswitch2_uplink1: vmnic3
     #vswitch2_uplink2: vmnic5
-
-
-
-# SolidFire variables
-    validate_sf_certs: "False"
-    accessgroup: "NetApp-HCI-Ansible-Cluster"
-    account: "{{ cluster_name }}"
-    volname: ansiblevolkp1
-
-    #optional QoS settings, otherwise will use 1000/15000/100000 and 2TB
-    #min: 500
-    #max: 15000
-    #burst: 100000
-    #volsize: 2048

@@ -141,7 +141,7 @@
       - runme is defined
   #- pause:
 
-  - name: Add 2nd NIC to vSwitch0
+  - name: Add 2nd NIC to vSwitch0 when using VSS
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -159,7 +159,7 @@
       - switch_type == "vss"
       - runme is defined
 
-  - name: Create VDS switch
+  - name: Create distributed switch for VDS
     community.vmware.vmware_dvswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -181,7 +181,7 @@
       - switch_type == "vds"
       - runme is defined
 
-  - name: Create management VDS portgroup
+  - name: Create management portgroup for VDS
     community.vmware.vmware_dvs_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -203,7 +203,7 @@
       - switch_type == "vds"
       - runme is defined
 
-  - name: Create VM_Network VDS portgroup
+  - name: Create VM_Network portgroup for VDS
     community.vmware.vmware_dvs_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -226,7 +226,7 @@
       - runme is defined
 
 
-  - name: Create vMotion VDS portgroup
+  - name: Create vMotion portgroup for VDS
     community.vmware.vmware_dvs_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -248,7 +248,7 @@
       - switch_type == "vds"
       - runme is defined
 
-  - name: Create iSCSI-A VDS portgroup
+  - name: Create iSCSI-A portgroup for VDS
     community.vmware.vmware_dvs_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -271,7 +271,7 @@
       - runme is defined
 
 
-  - name: Create iSCSI-B VDS portgroup
+  - name: Create iSCSI-B portgroup for VDS
     community.vmware.vmware_dvs_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -293,7 +293,7 @@
       - switch_type == "vds"
       - runme is defined
 
-  - name: Add Host to dVS for present state or remove first vmnic for absent
+  - name: Add Host to VDS for present state or remove first vmnic for absent
     community.vmware.vmware_dvs_host:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -306,6 +306,7 @@
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
+      - switch_type == "vds"
       - runme is defined
 
   - name: Migrate Management vmk0 from VSS to VDS
@@ -326,7 +327,7 @@
       - switch_type == "vds"
       - runme is defined
 
-  - name: Add VMware vSwitch0 for cleanup adding back in vmnic0
+  - name: Add VMware vSwitch0 for cleanup adding back in vmnic0 for VDS
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -359,9 +360,13 @@
   #    - switch_type == "vds"
 #
   - debug: msg=" PAUSE> Do not continue until after you migrate vmk0 manually via vCenter from VDS to VSS named Management Network"
-    when: state == "absent"
+    when:
+      - state == "absent"
+      - switch_type == "vds"
   - pause:
-    when: state == "absent"
+    when:
+      - state == "absent"
+      - switch_type == "vds"
 
 #do a manual migration at this point. you need to do it manually.
 
@@ -370,7 +375,7 @@
 
 #cannot migrate from VDS to VSS ansible
 
-  - name: Delete VMkernel port
+  - name: Delete vMotion VMkernel port from VDS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -384,9 +389,9 @@
     delegate_to: localhost
     when:
       - state == "absent"
-      - runme is defined
+      - switch_type == "vds"
 
-  - name: Delete VMkernel port
+  - name: Delete iSCSI-A VMkernel port from VDS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -400,9 +405,9 @@
     delegate_to: localhost
     when:
       - state == "absent"
-      - runme is defined
+      - switch_type == "vds"
 
-  - name: Delete VMkernel port
+  - name: Delete iSCSI-B VMkernel port from VDS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -416,10 +421,9 @@
     delegate_to: localhost
     when:
       - state == "absent"
-      - runme is defined
+      - switch_type == "vds"
 
-
-  - name: Delete dvSwitch '{{ vds_name }}'
+  - name: Delete VDS switch '{{ vds_name }}'
     community.vmware.vmware_dvswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -431,10 +435,11 @@
     delegate_to: localhost
     when:
       - state == "absent"
+      - switch_type == "vds"
 
 
 
-  - name: Remove VMware vSwitch0
+  - name: Remove VMware vSwitch0 from VDS setup
     community.vmware.vmware_vswitch:
       hostname: '{{ esxi_hostname }}'
       username: '{{ esxi_username }}'
@@ -448,9 +453,8 @@
     when:
       - switch_type == "vds"
       - state == "present"
-      - runme is defined
 
-  - name: Add Host to dVS
+  - name: Add Host to VDS switch
     community.vmware.vmware_dvs_host:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -464,11 +468,12 @@
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
-      - runme is defined
+      - switch_type == "vds"
       - state == "present"
+      - runme is defined
 
 
-  - name: Remove VM Network from vSwitch0
+  - name: Remove VM Network from vSwitch0 for VSS
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -689,28 +694,6 @@
       - state == "present"
       - switch_type == "vss"
 
-  - name: Add iSCSI-A vmkernel port using static network type to VDS
-    community.vmware.vmware_vmkernel:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      esxi_hostname: '{{ esxi_hostname }}'
-      dvswitch_name: "{{ vds_name }}"
-      portgroup_name: '{{ iscsia_portgroup_name }}'
-      mtu: 9000
-      network:
-        type: 'static'
-        default_gateway: "{{ iscsi_gateway }}"
-        ip_address: '{{ iscsia_ip }}'
-        subnet_mask: '{{ iscsi_subnet }}'
-      state: "{{ state }}"
-      validate_certs: "{{ validate_vm_certs | default(no) }}"
-    delegate_to: localhost
-    when:
-      - state == "present"
-      - switch_type == "vds"
-
-
   - name: Add or remove iSCSI-B port group to VSS
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
@@ -738,8 +721,6 @@
     when:
       - switch_type == "vss"
 
-
-
   - name: Add iSCSI-B vmkernel port using static network type to VSS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
@@ -760,28 +741,6 @@
     when:
       - state == "present"
       - switch_type == "vss"
-
-  - name: Add iSCSI-B vmkernel port using static network type to VDS
-    community.vmware.vmware_vmkernel:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      esxi_hostname: '{{ esxi_hostname }}'
-      dvswitch_name: "{{ vds_name }}"
-      portgroup_name: '{{ iscsib_portgroup_name }}'
-      mtu: 9000
-      network:
-        type: 'static'
-        default_gateway: "{{ iscsi_gateway }}"
-        ip_address: '{{ iscsib_ip }}'
-        subnet_mask: '{{ iscsi_subnet }}'
-      state: "{{ state }}"
-      validate_certs: "{{ validate_vm_certs | default(no) }}"
-    delegate_to: localhost
-    when:
-      - state == "present"
-      - switch_type == "vds"
-
 
   - name: Add or remove vMotion port group to VSS
     community.vmware.vmware_portgroup:
@@ -838,6 +797,51 @@
       - state == "present"
       - switch_type == "vss"
 
+
+
+  - name: Add iSCSI-A vmkernel port using static network type to VDS
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      dvswitch_name: "{{ vds_name }}"
+      portgroup_name: '{{ iscsia_portgroup_name }}'
+      mtu: 9000
+      network:
+        type: 'static'
+        default_gateway: "{{ iscsi_gateway }}"
+        ip_address: '{{ iscsia_ip }}'
+        subnet_mask: '{{ iscsi_subnet }}'
+      state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vds"
+
+
+  - name: Add iSCSI-B vmkernel port using static network type to VDS
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      dvswitch_name: "{{ vds_name }}"
+      portgroup_name: '{{ iscsib_portgroup_name }}'
+      mtu: 9000
+      network:
+        type: 'static'
+        default_gateway: "{{ iscsi_gateway }}"
+        ip_address: '{{ iscsib_ip }}'
+        subnet_mask: '{{ iscsi_subnet }}'
+      state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vds"
+
   - name: Add vMotion vmkernel port using static network type to VDS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
@@ -879,6 +883,7 @@
       esxi_hostname: "{{ esxi_hostname }}"
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     register: iscsi_info
+    when: state == "present"
 
   - name: Add VMKernels to iSCSI config of ESXi
     community.vmware.vmware_host_iscsi:
@@ -917,7 +922,30 @@
       - iscsi_vswitch != "vSwitch0"
       - switch_type == "vss"
 
+  #- name: Remove 2nd nic from vSwitch0
+  #  community.vmware.vmware_vswitch:
+  #    hostname: '{{ vcenter_hostname }}'
+  #    username: '{{ vcenter_username }}'
+  #    password: '{{ vcenter_password }}'
+  #    esxi_hostname: '{{ esxi_hostname }}'
+  #    switch_name: vSwitch0
+  #    nics:
+  #      - '{{ vswitch0_uplink1 }}'
+  #    mtu: 9000
+  #    validate_certs: "{{ validate_vm_certs | default(no) }}"
+  #  delegate_to: localhost
+  #  when:
+  #    - state == "absent"
+  #    - switch_type == "vss"
 
+  - debug: msg=" PAUSE> Do not continue until after removing 2nd vmnic manually. automation not working"
+    when:
+      - state == "absent"
+      - switch_type == "vss"
+  - pause:
+    when:
+      - state == "absent"
+      - switch_type == "vss"
 
   - name: Remove {{ esxi_hostname }} from vCenter
     community.vmware.vmware_host:
