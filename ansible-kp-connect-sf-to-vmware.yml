@@ -71,6 +71,7 @@
       datastore_name: '{{ volname }}'
       esxi_hostname: '{{ esxi_hostname }}'
       state: "{{ state | default(present) }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when: state == "absent"
 
@@ -200,6 +201,7 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       esxi_hostname: "{{ esxi_hostname }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     register: iscsi_info
     #when: state == "present"
   #- debug: msg=" {{ iscsi_info.iscsi_properties.iscsi_name }}"
@@ -234,8 +236,9 @@
         vmhba_name: "{{ iscsi_info.iscsi_properties.vmhba_name }}"
         send_target:
           address: "{{ send_target_address }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
       state: present
-      
+
 
   #- pause:
 
@@ -246,6 +249,7 @@
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
       refresh_storage: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when: state == "present"
 
@@ -261,5 +265,6 @@
       vmfs_version: 6
       esxi_hostname: '{{ esxi_hostname }}'
       state: "{{ state | default(present) }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when: state == "present"

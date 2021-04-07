@@ -9,10 +9,8 @@
     - community.vmware
 
 
-
   vars:
     state: present
-
 
 
   tasks:

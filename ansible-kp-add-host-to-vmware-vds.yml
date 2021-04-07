@@ -12,7 +12,7 @@
 
   vars:
     state: present
-    #runme: yes
+    runme: yes
 
 
 
@@ -70,13 +70,12 @@
       password: '{{ vcenter_password }}'
       datacenter_name: '{{ datacenter_name }}'
       state: "{{ state | default(present) }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     register: datacenter_create_result
     when:
       - state == "present"
       - runme is defined
-
-
 
 
   - name: Create Cluster
@@ -86,6 +85,7 @@
       password: "{{ vcenter_password }}"
       datacenter_name: "{{ datacenter_name }}"
       cluster_name: "{{ cluster_name }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     register: cl_result
     delegate_to: localhost
     when:
@@ -101,8 +101,10 @@
       cluster_name: "{{ cluster_name }}"
       enable_ha: true
       ha_vm_monitoring: vmMonitoringOnly
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
+      - state == "present"
       - runme is defined
 
   - name: Enable DRS and set default VM behavior to fully automated
@@ -114,8 +116,10 @@
       cluster_name: "{{ cluster_name }}"
       enable_drs: True
       drs_default_vm_behavior: fullyAutomated
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
+      - state == "present"
       - runme is defined
 
 
@@ -129,8 +133,8 @@
       esxi_hostname: '{{ esxi_hostname }}'
       esxi_username: '{{ esxi_username }}'
       esxi_password: '{{ esxi_password }}'
-      validate_certs: "{{ validate_vm_certs | default(no) }}"
       state: "{{ state | default(present) }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -173,6 +177,7 @@
       state: present
     delegate_to: localhost
     when:
+      - state == "present"
       - switch_type == "vds"
       - runme is defined
 
@@ -191,8 +196,10 @@
         block_override: true
         vlan_override: true
         security_override: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
+      - state == "present"
       - switch_type == "vds"
       - runme is defined
 
@@ -211,8 +218,10 @@
         block_override: true
         vlan_override: true
         security_override: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
+      - state == "present"
       - switch_type == "vds"
       - runme is defined
 
@@ -232,8 +241,10 @@
         block_override: true
         vlan_override: true
         security_override: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
+      - state == "present"
       - switch_type == "vds"
       - runme is defined
 
@@ -252,8 +263,10 @@
         block_override: true
         vlan_override: true
         security_override: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
+      - state == "present"
       - switch_type == "vds"
       - runme is defined
 
@@ -273,12 +286,14 @@
         block_override: true
         vlan_override: true
         security_override: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
+      - state == "present"
       - switch_type == "vds"
       - runme is defined
 
-  - name: Add Host to dVS
+  - name: Add Host to dVS for present state or remove first vmnic for absent
     community.vmware.vmware_dvs_host:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -290,10 +305,10 @@
       state: present
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
-    #when:
-    #  - runme is defined
+    when:
+      - runme is defined
 
-  - name: Migrate Management vmk0 to VDS
+  - name: Migrate Management vmk0 from VSS to VDS
     community.vmware.vmware_migrate_vmk:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -304,8 +319,10 @@
       current_portgroup_name: Management Network
       migrate_switch_name: "{{ vds_name }}"
       migrate_portgroup_name: Management Network
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
+      - state == "present"
       - switch_type == "vds"
       - runme is defined
 
@@ -341,6 +358,8 @@
   #    - state == "absent"
   #    - switch_type == "vds"
 #
+  - debug: msg=" PAUSE> Do not continue until after you migrate vmk0 manually via vCenter from VDS to VSS named Management Network"
+    when: state == "absent"
   - pause:
     when: state == "absent"
 
@@ -361,6 +380,7 @@
       portgroup_name: '{{ vMotion_portgroup_name }}'
       device: vmk3
       state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
@@ -376,7 +396,7 @@
       portgroup_name: '{{ iscsia_portgroup_name }}'
       device: vmk1
       state: absent
-
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
@@ -392,6 +412,7 @@
       portgroup_name: '{{ iscsib_portgroup_name }}'
       device: vmk2
       state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
@@ -406,6 +427,7 @@
       datacenter: '{{ datacenter_name }}'
       switch: ' {{ vds_name }}'
       state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
@@ -421,6 +443,7 @@
       nics: "{{ vswitch0_uplink1 }}"
       state: absent
       #mtu: 9000
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - switch_type == "vds"
@@ -454,6 +477,7 @@
       switch: vSwitch0
       portgroup: "VM Network"
       state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -461,7 +485,7 @@
 
 
 
-  - name: Remove Management Network VM Portgroup from vSwitch0
+  - name: Remove Management Network VM Portgroup from vSwitch0 for VSS
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -471,6 +495,7 @@
       portgroup: "{{ management_portgroup_name }}"
       vlan_id: "{{ management_vlan_id }}"
       state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - management_portgroup_name is defined
@@ -478,7 +503,7 @@
 
 
 
-  - name: Add Management Network VM Portgroup
+  - name: Add Management Network VM Portgroup for VSS
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -487,13 +512,14 @@
       switch: vSwitch0
       portgroup: "{{ management_portgroup_name }}"
       vlan_id: "{{ management_vlan_id }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
       - management_portgroup_name is defined
       - switch_type == "vss"
 
-  - name: Add VMware vSwitch1 on {{ esxi_hostname }}
+  - name: Add VMware vSwitch1 on {{ esxi_hostname }} for VSS
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -512,7 +538,7 @@
       - switch_type == "vss"
 
 
-  - name: Add or remove VM_Network port group to {{ vm_vswitch }} on {{ esxi_hostname }}
+  - name: Add or remove VM_Network port group to {{ vm_vswitch }} on {{ esxi_hostname }} for VSS
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -522,13 +548,14 @@
       portgroup: "{{ VM_network_portgroup_name }}"
       vlan_id: "{{ VM_network_vlan_id }}"
       state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - switch_type == "vss"
 
 
 
-  - name: Remove VMware vSwitch1 on {{ esxi_hostname }}
+  - name: Remove VMware vSwitch1 on {{ esxi_hostname }} for VSS
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -548,7 +575,7 @@
       - switch_type == "vss"
 
 
-  - name: Add VMware vSwitch2 on {{ esxi_hostname }}
+  - name: Add VMware vSwitch2 on {{ esxi_hostname }} for VSS
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -566,7 +593,7 @@
       - number_of_host_uplinks == 6
       - switch_type == "vss"
 
-  - name: Delete iSCSI-A vmkernel port
+  - name: Delete iSCSI-A vmkernel port from VSS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -576,12 +603,13 @@
       portgroup_name: '{{ iscsia_portgroup_name }}'
       device: vmk1
       state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
       - switch_type == "vss"
 
-  - name: Delete iSCSI-B vmkernel port
+  - name: Delete iSCSI-B vmkernel port from VSS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -591,12 +619,13 @@
       portgroup_name: '{{ iscsib_portgroup_name }}'
       device: vmk2
       state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
       - switch_type == "vss"
 
-  - name: Delete vMotion vmkernel port
+  - name: Delete vMotion vmkernel port from VSS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -606,6 +635,7 @@
       portgroup_name: '{{ iscsib_portgroup_name }}'
       device: vmk3
       state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "absent"
@@ -653,6 +683,7 @@
         ip_address: '{{ iscsia_ip }}'
         subnet_mask: '{{ iscsi_subnet }}'
       state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -673,6 +704,7 @@
         ip_address: '{{ iscsia_ip }}'
         subnet_mask: '{{ iscsi_subnet }}'
       state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -723,6 +755,7 @@
         ip_address: '{{ iscsib_ip }}'
         subnet_mask: '{{ iscsi_subnet }}'
       state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -743,6 +776,7 @@
         ip_address: '{{ iscsib_ip }}'
         subnet_mask: '{{ iscsi_subnet }}'
       state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -798,6 +832,7 @@
         ip_address: '{{ vmotion_ip }}'
         subnet_mask: '{{ vmotion_subnet }}'
       state: '{{ state | default(present) }}'
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -819,6 +854,7 @@
         ip_address: '{{ vmotion_ip }}'
         subnet_mask: '{{ vmotion_subnet }}'
       state: '{{ state | default(present) }}'
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
@@ -832,6 +868,8 @@
       password: "{{ vcenter_password }}"
       esxi_hostname: "{{ esxi_hostname }}"
       state: enabled
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    when: state == "present"
 
   - name: Gather iSCSI configuration information of ESXi host
     community.vmware.vmware_host_iscsi_info:
@@ -839,6 +877,7 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       esxi_hostname: "{{ esxi_hostname }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     register: iscsi_info
 
   - name: Add VMKernels to iSCSI config of ESXi
@@ -853,6 +892,7 @@
           - vmk1
           - vmk2
       state: present
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     when:
       - state == "present"
 
@@ -904,6 +944,7 @@
       password: '{{ vcenter_password }}'
       esxi_hostname: '{{ esxi_hostname }}'
       refresh_storage: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"

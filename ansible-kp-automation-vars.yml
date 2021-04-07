@@ -1,11 +1,9 @@
-
-
 # VMware vCenter variables
     validate_vm_certs: no
     datacenter_name: NetApp-HCI-Datacenter-01
     cluster_name: NetApp-HCI-Ansible-Cluster
 
-    #uncomment if you want to add an additional management port group to vSwitch0
+    #uncomment if you want to add an additional management port group to vSwitch0 for VSS
     #management_portgroup_name: HCI_Management_Port_Group
     #management_vlan_id:
 
@@ -21,6 +19,7 @@
 
 # ESXi host Networking Requirements from ESXi hostname as defined in .secrets.yml file
 # 2-cable or 6-cable setup
+# switch_type can be either "vds" or "vss" but for VDS automation is only setup to migrate over 2 uplinks
     number_of_host_uplinks: 2
     switch_type: "vds"
 
@@ -35,11 +34,7 @@
     vmotion_gateway: 10.45.89.1
     vmotion_subnet: 255.255.255.0
 
-
-#vmhba may be vmhba64 or vmhba65
-    #vmhba: vmhba64
-
-#VDS variables
+#VDS specific variables variables
     vds_name: "NetApp Ansible VDS"
     vds_management_portgroup_name: "Management Network"
     vds_management_vlan_id: 89
@@ -58,7 +53,6 @@
 # iSCSI switch uplinks for vSwitch2
     #vswitch2_uplink1: vmnic3
     #vswitch2_uplink2: vmnic5
-
 
 
 
