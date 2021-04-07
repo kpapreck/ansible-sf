@@ -1,7 +1,5 @@
 ---
 - hosts: localhost
-  #gather_facts: no
-
   vars_files:
   - '.secrets.yml'
   - 'ansible-kp-automation-vars.yml'
@@ -203,43 +201,13 @@
       - { portgroup_name: '{{ vds_management_portgroup_name }}', vlan_id: '{{ vds_management_vlan_id }}' }
       - { portgroup_name: '{{ VM_network_portgroup_name }}', vlan_id: '{{ VM_network_vlan_id }}' }
       - { portgroup_name: '{{ vMotion_portgroup_name }}', vlan_id: '{{ vMotion_vlan_id }}' }
+      - { portgroup_name: '{{ iscsia_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}' }
+      - { portgroup_name: '{{ iscsib_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}' }
     delegate_to: localhost
     when:
       - state == "present"
       - switch_type == "vds"
       - runme is defined
-
-
-  - name: Create portgroups for iSCSI VDS
-    community.vmware.vmware_dvs_portgroup:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      switch_name: "{{ vds_name }}"
-      portgroup_name: "{{ item.portgroup_name }}"
-      vlan_id: "{{ item.vlan_id }}"
-      num_ports: 120
-      portgroup_type: earlyBinding
-      state: present
-      port_policy:
-        block_override: true
-        vlan_override: true
-        security_override: true
-        uplink_teaming_override: true
-      teaming_policy:
-        load_balance_policy: 'failover_explicit'
-        active_uplinks: ['{{ item.activeNic }}']
-      validate_certs: "{{ validate_vm_certs | default(no) }}"
-    loop:
-      - { portgroup_name: '{{ iscsia_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', activeNic: 'Uplink_2' }
-      - { portgroup_name: '{{ iscsib_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', activeNic: 'Uplink_1' }
-    delegate_to: localhost
-    when:
-      - state == "present"
-      - switch_type == "vds"
-      #- runme is defined
-
-
 
   - name: Add Host to VDS for present state or remove first vmnic for absent
     community.vmware.vmware_dvs_host:

@@ -5,7 +5,7 @@
     validate_sf_certs: "False"
     accessgroup: "NetApp-HCI-Ansible-Cluster"
     account: "{{ cluster_name }}"
-    volname: ansiblevolkp1
+    volname: ansiblevolkp2
 
     #optional QoS settings, otherwise will use 1000/15000/100000 and 2TB
     #min: 500
@@ -44,7 +44,7 @@
     switch_type: "vds"
 
 # esxi_hostname: uncomment to override .secrets.yml for additional hosts
-    esxi_hostname: "10.45.89.122"
+    esxi_hostname: "winf-evo3-blade4.ntaplab.com"
     iscsia_ip: 10.45.91.217
     iscsib_ip: 10.45.91.218
     iscsi_gateway: 10.45.91.1
