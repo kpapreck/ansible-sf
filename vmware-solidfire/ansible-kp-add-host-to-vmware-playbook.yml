@@ -33,29 +33,29 @@
 
 
   - name: Remove datastore and SolidFire volume
-    include_tasks: ansible-kp-connect-sf-to-vmware-tasks.yml
+    include_tasks: tasks/ansible-kp-connect-sf-to-vmware-tasks.yml
     when: state == "absent"
 
   - name: Create Datacenter and Cluster
-    include_tasks: ansible-kp-add-host-to-vmware-dc-cluster-tasks.yml
+    include_tasks: tasks/ansible-kp-add-host-to-vmware-dc-cluster-tasks.yml
     when: state == "present"
 
   - name: Create or remove distributed switch for VDS
-    include_tasks: ansible-kp-add-host-to-vmware-vds-tasks.yml
+    include_tasks: tasks/ansible-kp-add-host-to-vmware-vds-tasks.yml
     when: switch_type == "vds"
 
   - name: Create or remove standard switch for VSS
-    include_tasks: ansible-kp-add-host-to-vmware-vss-tasks.yml
+    include_tasks: tasks/ansible-kp-add-host-to-vmware-vss-tasks.yml
     when: switch_type == "vss"
 
   - name: Setup iSCSI on ESXi host
-    include_tasks: ansible-kp-add-host-to-vmware-iscsi-tasks.yml
+    include_tasks: tasks/ansible-kp-add-host-to-vmware-iscsi-tasks.yml
     when: state == "present"
 
   - name: Setup SolidFire connections and datastore to ESXi host
-    include_tasks: ansible-kp-connect-sf-to-vmware-tasks.yml
+    include_tasks: tasks/ansible-kp-connect-sf-to-vmware-tasks.yml
     when: state == "present"
 
   - name: Remove ESXi host from vcenter
-    include_tasks: ansible-kp-add-host-to-vmware-removeESXi-tasks.yml
+    include_tasks: tasks/ansible-kp-add-host-to-vmware-removeESXi-tasks.yml
     when: state == "absent"
