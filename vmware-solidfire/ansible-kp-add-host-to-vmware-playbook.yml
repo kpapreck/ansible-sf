@@ -33,7 +33,7 @@
 
 
   - name: Remove datastore and SolidFire volume
-    include_tasks: ansible-kp-connect-sf-to-vmware.yml
+    include_tasks: ansible-kp-connect-sf-to-vmware-tasks.yml
     when: state == "absent"
 
   - name: Create Datacenter and Cluster
@@ -53,7 +53,7 @@
     when: state == "present"
 
   - name: Setup SolidFire connections and datastore to ESXi host
-    include_tasks: ansible-kp-connect-sf-to-vmware.yml
+    include_tasks: ansible-kp-connect-sf-to-vmware-tasks.yml
     when: state == "present"
 
   - name: Remove ESXi host from vcenter

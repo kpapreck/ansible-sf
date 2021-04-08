@@ -23,6 +23,10 @@
     datacenter_name: NetApp-HCI-Datacenter-01
     cluster_name: NetApp-HCI-Ansible-Cluster
 
+    #uncomment if you want to add an additional management port group to vSwitch0 for VSS
+    #management_portgroup_name: HCI_Management_Port_Group
+    #management_vlan_id:
+
     vMotion_portgroup_name: "vMotion"
     vMotion_vlan_id: 89
 
