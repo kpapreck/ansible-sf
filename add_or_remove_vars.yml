@@ -1,4 +1,9 @@
 ######################################################################################################################
+# Variables used for add_or_remove_host_to_vcenter_and_integrate_with_solidfire_storage (all sections)
+# Variables used for add_or_remove_solidfire_backed_datastores_and_setup_connections_to_esxi.yml (SolidFire section only)
+######################################################################################################################
+
+######################################################################################################################
 # SolidFire variables required for connecting SolidFire to VMware #ansible-kp-connect-sf-to-vmware.yml
 ######################################################################################################################
 
@@ -15,7 +20,8 @@
 
 
 ######################################################################################################################
-# VMware variables requiree for adding ESXi host to VMware #ansible-kp-add-host-to-vmware
+# VMware variables required for adding ESXi host to VMware
+# These variables are not required when only setting up connections to SolidFire and creating datastores
 ######################################################################################################################
 
 # VMware vCenter variables
@@ -25,7 +31,7 @@
 
     #uncomment if you want to add an additional management port group to vSwitch0 for VSS
     #management_portgroup_name: HCI_Management_Port_Group
-    #management_vlan_id:
+    #management_vlan_id: 89
 
     vMotion_portgroup_name: "vMotion"
     vMotion_vlan_id: 89

@@ -1,22 +1,18 @@
 ---
 - hosts: localhost
-  #gather_facts: no
 
   vars_files:
   - '.secrets.yml'
-  - 'ansible-kp-automation-vars.yml'
+  - 'add_or_remove_vars.yml'
 
   collections:
     - netapp.elementsw
     - community.vmware
 
-
-
   vars:
     sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
     item: "{{ volname }}"
     state: present
-    runme: yes
 
 
   tasks:
@@ -52,8 +48,6 @@
       - number_of_host_uplinks == 2
       - switch_type == "vds"
 
-
-
   - name: Login into vCenter
     uri:
       url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
@@ -63,7 +57,6 @@
       user: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
     register: login
-
 
 
   - name: Create Datacenter
@@ -78,7 +71,6 @@
     register: datacenter_create_result
     when:
       - state == "present"
-
 
   - name: Create Cluster
     community.vmware.vmware_cluster:
@@ -201,7 +193,6 @@
       - state == "present"
       - switch_type == "vds"
 
-
   - name: Create portgroups for iSCSI VDS
     community.vmware.vmware_dvs_portgroup:
       hostname: '{{ vcenter_hostname }}'
@@ -243,7 +234,6 @@
     when:
       - state == "absent"
 
-
   - name: Add Host to VDS for present state or remove first vmnic for absent
     community.vmware.vmware_dvs_host:
       hostname: '{{ vcenter_hostname }}'
@@ -275,14 +265,6 @@
     when:
       - state == "present"
       - switch_type == "vds"
-
-
-#do a manual migration at this point. you need to do it manually.
-
-#need to add here to then remove the other VMKs...
-#then should be able to remove switch
-
-#cannot migrate from VDS to VSS ansible
 
   - name: Delete VMkernel ports from VDS
     community.vmware.vmware_vmkernel:
@@ -322,6 +304,9 @@
       - switch_type == "vds"
 
 
+#do a manual migration at this point. you need to do it manually.
+#cannot migrate from VDS to VSS via Ansible. Have not looked into REST code to do it.
+
   - debug: msg=" PAUSE> Do not continue until after you migrate vmk0 manually via vCenter from VDS to VSS named Management Network"
     when:
       - state == "absent"
@@ -344,8 +329,6 @@
     when:
       - state == "absent"
       - switch_type == "vds"
-
-
 
   - name: Remove VMware vSwitch0 from VDS setup
     community.vmware.vmware_vswitch:
@@ -378,7 +361,6 @@
       - switch_type == "vds"
       - state == "present"
 
-
   - name: Remove VM Network from vSwitch0 for VSS
     community.vmware.vmware_portgroup:
       hostname: '{{ vcenter_hostname }}'
@@ -393,8 +375,6 @@
     when:
       - state == "present"
       - switch_type == "vss"
-
-
 
   - name: Remove Management Network VM Portgroup from vSwitch0 for VSS
     community.vmware.vmware_portgroup:
@@ -411,8 +391,6 @@
     when:
       - management_portgroup_name is defined
       - switch_type == "vss"
-
-
 
   - name: Add Management Network VM Portgroup for VSS
     community.vmware.vmware_portgroup:
@@ -450,7 +428,6 @@
       - state == "present"
       - number_of_host_uplinks == 6
       - switch_type == "vss"
-
 
   - name: Remove VMKernel ports for VSS
     community.vmware.vmware_vmkernel:
@@ -551,7 +528,6 @@
     when:
       - switch_type == "vss"
 
-
   - name: Add VMkernels for VSS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
@@ -641,7 +617,6 @@
       - state == "present"
 
 
-
   - name: Remove VMware vSwitch on {{ esxi_hostname }} for VSS
     community.vmware.vmware_vswitch:
       hostname: '{{ vcenter_hostname }}'
@@ -661,21 +636,42 @@
       - switch_type == "vss"
       - number_of_host_uplinks == 6
 
-  #- name: Remove 2nd nic from vSwitch0
-  #  community.vmware.vmware_vswitch:
-  #    hostname: '{{ vcenter_hostname }}'
-  #    username: '{{ vcenter_username }}'
-  #    password: '{{ vcenter_password }}'
-  #    esxi_hostname: '{{ esxi_hostname }}'
-  #    switch_name: vSwitch0
-  #    nics:
-  #      - '{{ vswitch0_uplink1 }}'
-  #    mtu: 9000
-  #    validate_certs: "{{ validate_vm_certs | default(no) }}"
-  #  delegate_to: localhost
-  #  when:
-  #    - state == "absent"
-  #    - switch_type == "vss"
+  - name: Remove 2nd adapter for Management port group of VSS
+    community.vmware.vmware_portgroup:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: "vSwitch0"
+      portgroup: "Management Network"
+      vlan_id: "{{ management_vlan_id }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      teaming:
+        active_adapters:
+          - "{{ vswitch0_uplink2 }}"
+      state: "present"
+    delegate_to: localhost
+    when:
+      - switch_type == "vss"
+      - state == "absent"
+      - management_portgroup_name is not defined
+
+  - name: Remove 2nd nic from vSwitch0
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: vSwitch0
+      state: present
+      nics:
+        - '{{ vswitch0_uplink2 }}'
+      mtu: 9000
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "absent"
+      - switch_type == "vss"
 
   - debug: msg=" PAUSE> Do not continue until after removing 2nd vmnic manually. automation not working"
     when:
@@ -788,29 +784,13 @@
     when:
       - jsonAccountResults.json.error is not defined
 
-
-
-  - name: Unmount VMFS datastores to ESXi
-    vmware_host_datastore:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      datastore_name: '{{ volname }}'
-      esxi_hostname: '{{ esxi_hostname }}'
-      state: "{{ state | default(present) }}"
-      validate_certs: "{{ validate_vm_certs | default(no) }}"
-    delegate_to: localhost
-    when:
-      - state == "absent"
-      - seth is defined
-
   - name: Create or remove data volume
     na_elementsw_volume:
        hostname: "{{ elementsw_hostname }}"
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
        state: "{{ state | default(present) }}"
-       name: "{{ item }}"
+       name: "{{ volname }}"
        qos: {minIOPS: "{{ min | default(1000) }}", maxIOPS: "{{ max | default(10000) }}", burstIOPS: "{{ burst | default(100000) }}"}
        account_id: "{{ account }}"
        size: "{{ volsize | default(2048) }}"
