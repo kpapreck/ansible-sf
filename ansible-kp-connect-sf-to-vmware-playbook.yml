@@ -238,6 +238,7 @@
           address: "{{ send_target_address }}"
       validate_certs: "{{ validate_vm_certs | default(no) }}"
       state: present
+    when: state == "present"
 
 
   #- pause:

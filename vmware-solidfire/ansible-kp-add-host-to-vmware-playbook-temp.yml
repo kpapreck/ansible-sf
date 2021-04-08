@@ -1,0 +1,29 @@
+---
+- hosts: localhost
+  #gather_facts: no
+
+  vars_files:
+  - '.secrets.yml'
+  - 'ansible-kp-automation-vars.yml'
+
+  collections:
+    - netapp.elementsw
+    - community.vmware
+
+
+
+  vars:
+    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
+    #item: "{{ volname }}"
+    state: present
+    runme: yes
+
+
+  tasks:
+
+  - name: check state
+      policy == "2"
+    when: state == "absent"
+
+  - name: run playbook
+    include_tasks: ansible-kp-add-host-to-vmware-playbook-task.yml

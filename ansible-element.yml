@@ -1,7 +1,7 @@
 ---
 - hosts: localhost
   vars_files:
-  - 'sfsecrets.yml'
+  - '.secrets.yml'
 
   collections:
     - netapp.elementsw
@@ -9,8 +9,8 @@
   vars:
    id: "1"
    volsize: 1500
-   volname: ansiblevol1
-   volname2: ansiblevol2
+   volname: ansiblevol-to-del1
+   volname2: ansiblevol-to-del2
    snapID: "231"
    account_name: ansible_acct
    account_name_new: ansible_acct_renamed
@@ -141,6 +141,7 @@
       state: absent
       name: "{{ volname }}"
       account_id: "{{ id }}"
+      #purge: False
     tags:
     - delete-vol
 
@@ -153,6 +154,7 @@
       state: absent
       name: "{{ volname2 }}"
       account_id: "{{ id }}"
+      #purge: False
     tags:
     - delete-vol
 

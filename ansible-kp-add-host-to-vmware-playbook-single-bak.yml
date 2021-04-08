@@ -19,7 +19,6 @@
     runme: yes
 
 
-
   tasks:
   - name: Define additional vSwitch variables if using 2-cable VSS
     set_fact:
@@ -79,7 +78,6 @@
     register: datacenter_create_result
     when:
       - state == "present"
-      - runme is defined
 
 
   - name: Create Cluster
@@ -94,7 +92,6 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runme is defined
 
   - name: Enable HA and VM monitoring without admission control
     community.vmware.vmware_cluster_ha:
@@ -109,7 +106,6 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runme is defined
 
   - name: Enable DRS and set default VM behavior to fully automated
     community.vmware.vmware_cluster_drs:
@@ -124,7 +120,6 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runme is defined
 
 
   - name: Add ESXi Host to vCenter
@@ -142,8 +137,6 @@
     delegate_to: localhost
     when:
       - state == "present"
-      - runme is defined
-  #- pause:
 
   - name: Add 2nd NIC to vSwitch0 when using VSS
     community.vmware.vmware_vswitch:
@@ -161,7 +154,6 @@
     when:
       - state == "present"
       - switch_type == "vss"
-      - runme is defined
 
   - name: Create distributed switch for VDS
     community.vmware.vmware_dvswitch:
@@ -183,7 +175,6 @@
     when:
       - state == "present"
       - switch_type == "vds"
-      - runme is defined
 
   - name: Create portgroups for VDS
     community.vmware.vmware_dvs_portgroup:
@@ -209,7 +200,6 @@
     when:
       - state == "present"
       - switch_type == "vds"
-      - runme is defined
 
 
   - name: Create portgroups for iSCSI VDS
@@ -239,8 +229,19 @@
     when:
       - state == "present"
       - switch_type == "vds"
-      #- runme is defined
 
+  - name: Unmount VMFS datastores to ESXi
+    vmware_host_datastore:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datastore_name: '{{ volname }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      state: "{{ state | default(present) }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "absent"
 
 
   - name: Add Host to VDS for present state or remove first vmnic for absent
@@ -257,7 +258,6 @@
     delegate_to: localhost
     when:
       - switch_type == "vds"
-      - runme is defined
 
   - name: Migrate Management vmk0 from VSS to VDS
     community.vmware.vmware_migrate_vmk:
@@ -275,7 +275,6 @@
     when:
       - state == "present"
       - switch_type == "vds"
-      - runme is defined
 
 
 #do a manual migration at this point. you need to do it manually.
@@ -378,7 +377,6 @@
     when:
       - switch_type == "vds"
       - state == "present"
-      - runme is defined
 
 
   - name: Remove VM Network from vSwitch0 for VSS
@@ -624,7 +622,7 @@
       esxi_hostname: "{{ esxi_hostname }}"
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     register: iscsi_info
-    when: state == "present"
+    #when: state == "present"
 
   - name: Add VMKernels to iSCSI config of ESXi
     community.vmware.vmware_host_iscsi:
@@ -642,7 +640,6 @@
     when:
       - state == "present"
 
-  #- pause:
 
 
   - name: Remove VMware vSwitch on {{ esxi_hostname }} for VSS
@@ -707,17 +704,17 @@
 
 
 
-  - name: Rescan HBA's for a given ESXi host and refresh storage system objects
-    community.vmware.vmware_host_scanhba:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      esxi_hostname: '{{ esxi_hostname }}'
-      refresh_storage: true
-      validate_certs: "{{ validate_vm_certs | default(no) }}"
-    delegate_to: localhost
-    when:
-      - state == "present"
+  #- name: Rescan HBA's for a given ESXi host and refresh storage system objects
+  #  community.vmware.vmware_host_scanhba:
+  #    hostname: '{{ vcenter_hostname }}'
+  #    username: '{{ vcenter_username }}'
+  #    password: '{{ vcenter_password }}'
+  #    esxi_hostname: '{{ esxi_hostname }}'
+  #    refresh_storage: true
+  #    validate_certs: "{{ validate_vm_certs | default(no) }}"
+  #  delegate_to: localhost
+  #  when:
+  #    - state == "present"
 
 
   #- name: Delete Cluster
@@ -751,9 +748,9 @@
   #  when:
   #    - state == "absent"
   #    - DESTRUCTION_MODE is defined
-  - debug: msg=" PAUSE> Starting SolidFire setup. For subsequent datastores adds or removes use ansible-kp-connect-sf-to-vmware.yml"
+  #- debug: msg=" PAUSE> Starting SolidFire setup. For subsequent datastores adds or removes use ansible-kp-connect-sf-to-vmware.yml"
 
-  - pause:
+  #- pause:
 
 
   - name: Create New Account
@@ -803,7 +800,9 @@
       state: "{{ state | default(present) }}"
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
-    when: state == "absent"
+    when:
+      - state == "absent"
+      - seth is defined
 
   - name: Create or remove data volume
     na_elementsw_volume:
@@ -925,14 +924,14 @@
 
   #- pause:
 
-  - name: Gather iSCSI configuration information of ESXi host
-    community.vmware.vmware_host_iscsi_info:
-      hostname: "{{ vcenter_hostname }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      esxi_hostname: "{{ esxi_hostname }}"
-      validate_certs: "{{ validate_vm_certs | default(no) }}"
-    register: iscsi_info
+  #- name: Gather iSCSI configuration information of ESXi host
+  #  community.vmware.vmware_host_iscsi_info:
+  #    hostname: "{{ vcenter_hostname }}"
+  #    username: "{{ vcenter_username }}"
+  #    password: "{{ vcenter_password }}"
+  #    esxi_hostname: "{{ esxi_hostname }}"
+  #    validate_certs: "{{ validate_vm_certs | default(no) }}"
+  #  register: iscsi_info
     #when: state == "present"
   #- debug: msg=" {{ iscsi_info.iscsi_properties.iscsi_name }}"
   #- debug: msg=" {{ iscsi_info.iscsi_properties.vmhba_name }}"
@@ -968,6 +967,7 @@
           address: "{{ send_target_address }}"
       validate_certs: "{{ validate_vm_certs | default(no) }}"
       state: present
+    when: state == "present"
 
 
   #- pause:
