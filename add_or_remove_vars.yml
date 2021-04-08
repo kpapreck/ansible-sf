@@ -5,7 +5,7 @@
     validate_sf_certs: "False"
     accessgroup: "NetApp-HCI-Ansible-Cluster"
     account: "{{ cluster_name }}"
-    volname: ansiblevolkp2
+    volname: ansiblevolkp3
 
     #optional QoS settings, otherwise will use 1000/15000/100000 and 2TB
     #min: 500
@@ -41,7 +41,7 @@
 # 2-cable or 6-cable setup
 # switch_type can be either "vds" or "vss" but for VDS automation is only setup to migrate over 2 uplinks
     number_of_host_uplinks: 2
-    switch_type: "vds"
+    switch_type: "vss"
 
 # esxi_hostname: uncomment to override .secrets.yml for additional hosts
     esxi_hostname: "winf-evo3-blade4.ntaplab.com"
