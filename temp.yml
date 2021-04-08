@@ -1,0 +1,26 @@
+
+  - name: Login into vCenter
+    uri:
+      url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
+      force_basic_auth: yes
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      method: POST
+      user: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+    register: login
+
+
+
+  - name: Create Datacenter
+    community.vmware.vmware_datacenter:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter_name: '{{ datacenter_name }}'
+      state: "{{ state | default(present) }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    register: datacenter_create_result
+    when:
+      - state == "present"
+      - runme is defined

@@ -1,0 +1,71 @@
+######################################################################################################################
+# SolidFire variables required for connecting SolidFire to VMware #ansible-kp-connect-sf-to-vmware.yml
+######################################################################################################################
+
+    validate_sf_certs: "False"
+    accessgroup: "NetApp-HCI-Ansible-Cluster"
+    account: "{{ cluster_name }}"
+    volname: ansiblevolkp2
+
+    #optional QoS settings, otherwise will use 1000/15000/100000 and 2TB
+    #min: 500
+    #max: 15000
+    #burst: 100000
+    #volsize: 2048
+
+
+######################################################################################################################
+# VMware variables requiree for adding ESXi host to VMware #ansible-kp-add-host-to-vmware
+######################################################################################################################
+
+# VMware vCenter variables
+    validate_vm_certs: no
+    datacenter_name: NetApp-HCI-Datacenter-01
+    cluster_name: NetApp-HCI-Ansible-Cluster
+
+    vMotion_portgroup_name: "vMotion"
+    vMotion_vlan_id: 89
+
+    VM_network_portgroup_name: "VM_Network"
+    VM_network_vlan_id: 89
+
+    iscsia_portgroup_name: "iSCSI-A"
+    iscsib_portgroup_name: "iSCSI-B"
+    iscsi_vlan_id: 91
+
+# ESXi host Networking Requirements from ESXi hostname as defined in .secrets.yml file
+# 2-cable or 6-cable setup
+# switch_type can be either "vds" or "vss" but for VDS automation is only setup to migrate over 2 uplinks
+    number_of_host_uplinks: 2
+    switch_type: "vds"
+
+# esxi_hostname: uncomment to override .secrets.yml for additional hosts
+    esxi_hostname: "winf-evo3-blade4.ntaplab.com"
+    iscsia_ip: 10.45.91.217
+    iscsib_ip: 10.45.91.218
+    iscsi_gateway: 10.45.91.1
+    iscsi_subnet: 255.255.255.0
+
+    vmotion_ip: 10.45.89.191
+    vmotion_gateway: 10.45.89.1
+    vmotion_subnet: 255.255.255.0
+
+#VDS specific variables variables
+    vds_name: "NetApp Ansible VDS"
+    vds_management_portgroup_name: "Management Network"
+    vds_management_vlan_id: 89
+
+#2-cable or 6-cable VSS variables for ESXi Host
+    vswitch0_uplink1: vmnic0
+    vswitch0_uplink2: vmnic1
+
+
+# 6-cable additional VSS variables for ESXi host
+
+# VM_Network and vMotion switch uplinks for vSwitch1
+    #vswitch1_uplink1: vmnic4
+    #vswitch1_uplink2: vmnic6
+
+# iSCSI switch uplinks for vSwitch2
+    #vswitch2_uplink1: vmnic3
+    #vswitch2_uplink2: vmnic5

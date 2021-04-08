@@ -1,0 +1,50 @@
+
+  - name: Enable iSCSI on {{ esxi_hostname }}
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      state: enabled
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    when: state == "present"
+
+  - name: Gather iSCSI configuration information of ESXi host
+    community.vmware.vmware_host_iscsi_info:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    register: iscsi_info
+    when: state == "present"
+
+  - name: Add VMKernels to iSCSI config of ESXi
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      iscsi_config:
+        vmhba_name: "{{ iscsi_info.iscsi_properties.vmhba_name }}"
+        port_bind:
+          - vmk1
+          - vmk2
+      state: present
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    when:
+      - state == "present"
+
+
+  - name: Rescan HBA's for a given ESXi host and refresh storage system objects
+    community.vmware.vmware_host_scanhba:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      refresh_storage: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - doyou is defined

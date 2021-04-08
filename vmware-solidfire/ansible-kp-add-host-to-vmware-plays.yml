@@ -1,0 +1,61 @@
+---
+- hosts: localhost
+  #gather_facts: no
+
+  vars_files:
+  - '.secrets.yml'
+  - 'ansible-kp-automation-vars.yml'
+
+  collections:
+    - netapp.elementsw
+    - community.vmware
+
+
+
+  vars:
+    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
+    #item: "{{ volname }}"
+    state: present
+    runme: yes
+
+
+  tasks:
+
+  - name: Login into vCenter
+    uri:
+      url: https://{{ vcenter_hostname }}/rest/com/vmware/cis/session
+      force_basic_auth: yes
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      method: POST
+      user: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+    register: login
+
+
+  - name: Remove datastore and SolidFire volume
+    include_tasks: ansible-kp-connect-sf-to-vmware.yml
+    when: state == "absent"
+
+  - name: Create Datacenter and Cluster
+    include_tasks: ansible-kp-add-host-to-vmware-dc-cluster-tasks.yml
+    when: state == "present"
+
+  - name: Create or remove distributed switch for VDS
+    include_tasks: ansible-kp-add-host-to-vmware-vds-tasks.yml
+    when: switch_type == "vds"
+
+  - name: Create or remove standard switch for VSS
+    include_tasks: ansible-kp-add-host-to-vmware-vss-tasks.yml
+    when: switch_type == "vss"
+
+  - name: Setup iSCSI on ESXi host
+    include_tasks: ansible-kp-add-host-to-vmware-iscsi-tasks.yml
+    when: state == "present"
+
+  - name: Setup SolidFire connections and datastore to ESXi host
+    include_tasks: ansible-kp-connect-sf-to-vmware.yml
+    when: state == "present"
+
+  - name: Remove ESXi host from vcenter
+    include_tasks: ansible-kp-add-host-to-vmware-removeESXi-tasks.yml
+    when: state == "absent"

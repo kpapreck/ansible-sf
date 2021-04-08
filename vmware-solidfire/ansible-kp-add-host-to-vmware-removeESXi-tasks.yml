@@ -1,0 +1,25 @@
+
+  - debug: msg=" PAUSE> Do not continue until after removing 2nd vmnic manually. automation not working"
+    when:
+      - state == "absent"
+      - switch_type == "vss"
+  - pause:
+    when:
+      - state == "absent"
+      - switch_type == "vss"
+
+  - name: Remove {{ esxi_hostname }} from vCenter
+    community.vmware.vmware_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      esxi_username: '{{ esxi_username }}'
+      esxi_password: '{{ esxi_password }}'
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      state: "{{ state | default(present) }}"
+    delegate_to: localhost
+    when:
+      - state == "absent"

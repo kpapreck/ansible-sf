@@ -1,0 +1,283 @@
+
+  - name: Define additional vSwitch variables if using 2-cable VDS
+    set_fact:
+      vm_vswitch: "{{ vds_name }}"
+      iscsi_vswitch: "{{ vds_name }}"
+      vswitch2_uplink1: "{{ vswitch0_uplink1 }}"
+      vswitch2_uplink2: "{{ vswitch0_uplink2 }}"
+      vswitch1_uplink1: "{{ vswitch0_uplink1 }}"
+      vswitch1_uplink2: "{{ vswitch0_uplink2 }}"
+    when:
+      - number_of_host_uplinks == 2
+      - switch_type == "vds"
+
+  - name: Create distributed switch for VDS
+    community.vmware.vmware_dvswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter: '{{ datacenter_name }}'
+      switch: "{{ vds_name }}"
+      version: 6.5.0
+      mtu: 9000
+      uplink_quantity: 2
+      uplink_prefix: 'Uplink_'
+      discovery_protocol: lldp
+      discovery_operation: both
+      multicast_filtering_mode: basic
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      state: present
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vds"
+
+  - name: Create portgroups for VDS
+    community.vmware.vmware_dvs_portgroup:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      switch_name: "{{ vds_name }}"
+      portgroup_name: "{{ item.portgroup_name }}"
+      vlan_id: "{{ item.vlan_id }}"
+      num_ports: 120
+      portgroup_type: earlyBinding
+      state: present
+      port_policy:
+        block_override: true
+        vlan_override: true
+        security_override: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    loop:
+      - { portgroup_name: '{{ vds_management_portgroup_name }}', vlan_id: '{{ vds_management_vlan_id }}' }
+      - { portgroup_name: '{{ VM_network_portgroup_name }}', vlan_id: '{{ VM_network_vlan_id }}' }
+      - { portgroup_name: '{{ vMotion_portgroup_name }}', vlan_id: '{{ vMotion_vlan_id }}' }
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vds"
+
+
+  - name: Create portgroups for iSCSI VDS
+    community.vmware.vmware_dvs_portgroup:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      switch_name: "{{ vds_name }}"
+      portgroup_name: "{{ item.portgroup_name }}"
+      vlan_id: "{{ item.vlan_id }}"
+      num_ports: 120
+      portgroup_type: earlyBinding
+      state: present
+      port_policy:
+        block_override: true
+        vlan_override: true
+        security_override: true
+        uplink_teaming_override: true
+      teaming_policy:
+        load_balance_policy: 'failover_explicit'
+        active_uplinks: ['{{ item.activeNic }}']
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    loop:
+      - { portgroup_name: '{{ iscsia_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', activeNic: 'Uplink_2' }
+      - { portgroup_name: '{{ iscsib_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', activeNic: 'Uplink_1' }
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vds"
+
+
+  - name: Add Host to VDS for present state or remove first vmnic for absent
+    community.vmware.vmware_dvs_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: "{{ vds_name }}"
+      vmnics:
+        - "{{ vswitch0_uplink2 }}"
+      state: present
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - switch_type == "vds"
+
+  - name: Migrate Management vmk0 from VSS to VDS
+    community.vmware.vmware_migrate_vmk:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      device: vmk0
+      current_switch_name: vSwitch0
+      current_portgroup_name: Management Network
+      migrate_switch_name: "{{ vds_name }}"
+      migrate_portgroup_name: Management Network
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vds"
+
+
+#do a manual migration at this point. you need to do it manually.
+
+#need to add here to then remove the other VMKs...
+#then should be able to remove switch
+
+#cannot migrate from VDS to VSS ansible
+
+  - name: Delete VMkernel ports from VDS
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      dvswitch_name: '{{ vds_name }}'
+      portgroup_name: '{{ item.portgroup_name }}'
+      device: '{{ item.device }}'
+      state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    loop:
+      - { portgroup_name: '{{ vMotion_portgroup_name }}', device: 'vmk3' }
+      - { portgroup_name: '{{ iscsia_portgroup_name }}', device: 'vmk1' }
+      - { portgroup_name: '{{ iscsib_portgroup_name }}', device: 'vmk2' }
+    when:
+      - state == "absent"
+      - switch_type == "vds"
+
+  - name: Add VMware vSwitch0 for cleanup adding back in vmnic0 for VDS
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: vSwitch0
+      state: present
+      mtu: 9000
+      nics:
+        - '{{ vswitch0_uplink1 | default(vmnic0) }}'
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "absent"
+      - switch_type == "vds"
+
+
+  - debug: msg=" PAUSE> Do not continue until after you migrate vmk0 manually via vCenter from VDS to VSS named Management Network"
+    when:
+      - state == "absent"
+      - switch_type == "vds"
+  - pause:
+    when:
+      - state == "absent"
+      - switch_type == "vds"
+
+  - name: Delete VMware switch '{{ vds_name }}'
+    community.vmware.vmware_dvswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter: '{{ datacenter_name }}'
+      switch: ' {{ vds_name }}'
+      state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "absent"
+      - switch_type == "vds"
+
+
+  - name: Remove VMware vSwitch0 from VDS setup
+    community.vmware.vmware_vswitch:
+      hostname: '{{ esxi_hostname }}'
+      username: '{{ esxi_username }}'
+      password: '{{ esxi_password }}'
+      switch: vSwitch0
+      nics: "{{ vswitch0_uplink1 }}"
+      state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - switch_type == "vds"
+      - state == "present"
+
+  - name: Add Host to VDS switch
+    community.vmware.vmware_dvs_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: "{{ vds_name }}"
+      vmnics:
+        - "{{ vswitch0_uplink2 }}"
+        - "{{ vswitch0_uplink1 }}"
+      state: present
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - switch_type == "vds"
+      - state == "present"
+
+  - name: Add VMkernels for VDS
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      dvswitch_name: "{{ item.dvswitch_name }}"
+      portgroup_name: '{{ item.portgroup_name }}'
+      mtu: 9000
+      network:
+        type: 'static'
+        default_gateway: "{{ item.default_gateway }}"
+        ip_address: '{{ item.ip_address }}'
+        subnet_mask: '{{ item.subnet_mask }}'
+      state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    loop:
+      - { dvswitch_name: '{{ vds_name }}', portgroup_name: '{{ iscsia_portgroup_name }}', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsia_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
+      - { dvswitch_name: '{{ vds_name }}', portgroup_name: '{{ iscsib_portgroup_name }}', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsib_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
+      - { dvswitch_name: '{{ vds_name }}', portgroup_name: '{{ vMotion_portgroup_name }}', default_gateway: '{{ vmotion_gateway }}', ip_address: '{{ vmotion_ip }}', subnet_mask: '{{ vmotion_subnet }}'}
+    when:
+      - state == "present"
+      - switch_type == "vds"
+
+
+  - name: Enable iSCSI on {{ esxi_hostname }}
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      state: enabled
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    when: state == "present"
+
+  - name: Gather iSCSI configuration information of ESXi host
+    community.vmware.vmware_host_iscsi_info:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    register: iscsi_info
+    when: state == "present"
+
+  - name: Add VMKernels to iSCSI config of ESXi
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      iscsi_config:
+        vmhba_name: "{{ iscsi_info.iscsi_properties.vmhba_name }}"
+        port_bind:
+          - vmk1
+          - vmk2
+      state: present
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    when:
+      - state == "present"

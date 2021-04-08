@@ -29,13 +29,8 @@
       - number_of_host_uplinks == 2
       - switch_type == "vss"
 
-  - name: Define additional vSwitch variables if using 6-cable VSS
-    set_fact:
-      vm_vswitch: vSwitch1
-      iscsi_vswitch: vSwitch2
-    when:
-      - number_of_host_uplinks == 6
-      - switch_type == "vss"
+  - name: log into vcenter
+    include_tasks: temp.yml
 
   - name: Define additional vSwitch variables if using 2-cable VDS
     set_fact:
@@ -49,7 +44,7 @@
       - number_of_host_uplinks == 2
       - switch_type == "vds"
 
-
+  - pause:
 
   - name: Login into vCenter
     uri:

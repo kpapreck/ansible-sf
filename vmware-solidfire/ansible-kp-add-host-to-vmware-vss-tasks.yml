@@ -1,0 +1,353 @@
+
+  - name: Define additional vSwitch variables if using 2-cable VSS
+    set_fact:
+      vm_vswitch: vSwitch0
+      iscsi_vswitch: vSwitch0
+      vswitch2_uplink1: "{{ vswitch0_uplink1 }}"
+      vswitch2_uplink2: "{{ vswitch0_uplink2 }}"
+      vswitch1_uplink1: "{{ vswitch0_uplink1 }}"
+      vswitch1_uplink2: "{{ vswitch0_uplink2 }}"
+    when:
+      - number_of_host_uplinks == 2
+      - switch_type == "vss"
+
+  - name: Define additional vSwitch variables if using 6-cable VSS
+    set_fact:
+      vm_vswitch: vSwitch1
+      iscsi_vswitch: vSwitch2
+    when:
+      - number_of_host_uplinks == 6
+      - switch_type == "vss"
+
+
+  - name: Add 2nd NIC to vSwitch0 when using VSS
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: vSwitch0
+      nics:
+        - '{{ vswitch0_uplink1 }}'
+        - '{{ vswitch0_uplink2 }}'
+      mtu: 9000
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vss"
+
+  - name: Remove VM Network from vSwitch0 for VSS
+    community.vmware.vmware_portgroup:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch0
+      portgroup: "VM Network"
+      state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vss"
+
+
+
+  - name: Remove Management Network VM Portgroup from vSwitch0 for VSS
+    community.vmware.vmware_portgroup:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch0
+      portgroup: "{{ management_portgroup_name }}"
+      vlan_id: "{{ management_vlan_id }}"
+      state: absent
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - management_portgroup_name is defined
+      - switch_type == "vss"
+
+
+
+  - name: Add Management Network VM Portgroup for VSS
+    community.vmware.vmware_portgroup:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: vSwitch0
+      portgroup: "{{ management_portgroup_name }}"
+      vlan_id: "{{ management_vlan_id }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - management_portgroup_name is defined
+      - switch_type == "vss"
+
+  - name: Add VMware vSwitch1 and vSwitch2 on {{ esxi_hostname }} for 6-cable VSS
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: '{{ item.switch_name }}'
+      nics:
+        - '{{ item.nic1 }}'
+        - '{{ item.nic2 }}'
+      mtu: 9000
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    loop:
+      - { switch_name: 'vSwitch1', nic1: '{{ vswitch1_uplink1 | default(vmnic3) }}', nic2: '{{ vswitch1_uplink2 | default(vmnic4) }}' }
+      - { switch_name: 'vSwitch2', nic1: '{{ vswitch2_uplink1 | default(vmnic5) }}', nic2: '{{ vswitch2_uplink2 | default(vmnic6) }}' }
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - number_of_host_uplinks == 6
+      - switch_type == "vss"
+
+
+  - name: Remove VMKernel ports for VSS
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      vswitch_name: "{{ item.vswitch_name }}"
+      portgroup_name: '{{ item.portgroup_name }}'
+      device: "{{ item.device }}"
+      state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    loop:
+      - { vswitch_name: '{{ iscsi_vswitch }}', portgroup_name: '{{ iscsia_portgroup_name }}', device: 'vmk1' }
+      - { vswitch_name: '{{ iscsi_vswitch }}', portgroup_name: '{{ iscsib_portgroup_name }}', device: 'vmk2' }
+      - { vswitch_name: '{{ vm_vswitch }}', portgroup_name: '{{ vMotion_portgroup_name }}', device: 'vmk3' }
+    delegate_to: localhost
+    when:
+      - state == "absent"
+      - switch_type == "vss"
+
+  - name: Add or remove portgroups from VSS
+    community.vmware.vmware_portgroup:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: "{{ item.switch }}"
+      portgroup: "{{ item.portgroup }}"
+      vlan_id: "{{ item.vlan_id }}"
+      state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    loop:
+      - { switch: '{{ vm_vswitch }}', portgroup: '{{ VM_network_portgroup_name }}', vlan_id: '{{ VM_network_vlan_id }}' }
+    delegate_to: localhost
+    when:
+      - switch_type == "vss"
+
+
+  - name: Add or Remove iSCSI portgroups for VSS
+    community.vmware.vmware_portgroup:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: "{{ item.switch }}"
+      portgroup: "{{ item.portgroup }}"
+      vlan_id: "{{ item.vlan_id }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      state: "{{ state }}"
+      security:
+        promiscuous_mode: False
+        mac_changes: False
+        forged_transmits: False
+      teaming:
+        #load_balancing: failover_explicit
+        network_failure_detection: link_status_only
+        notify_switches: true
+        failback: true
+        active_adapters:
+            - "{{ item.adapter }}"
+    register: teaming_result
+    loop:
+      - { switch: '{{ iscsi_vswitch }}', portgroup: '{{ iscsia_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', adapter: '{{ vswitch2_uplink2 }}' }
+      - { switch: '{{ iscsi_vswitch }}', portgroup: '{{ iscsib_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', adapter: '{{ vswitch2_uplink1 }}' }
+    delegate_to: localhost
+    when: switch_type == "vss"
+
+  - name: Add or remove vMotion port group to VSS
+    community.vmware.vmware_portgroup:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch: "{{ vm_vswitch }}"
+      portgroup: "{{ vMotion_portgroup_name }}"
+      vlan_id: "{{ vMotion_vlan_id }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      security:
+        promiscuous_mode: False
+        mac_changes: False
+        forged_transmits: False
+      traffic_shaping:
+        enabled: True
+        average_bandwidth: 1000000
+        peak_bandwidth: 1200000
+        burst_size: 64000
+      teaming:
+        network_failure_detection: link_status_only
+        notify_switches: true
+        failback: true
+        active_adapters:
+          - "{{ vswitch1_uplink2 }}"
+          - "{{ vswitch1_uplink1 }}"
+      state: "{{ state }}"
+    register: teaming_result
+    delegate_to: localhost
+    when:
+      - switch_type == "vss"
+
+
+  - name: Add VMkernels for VSS
+    community.vmware.vmware_vmkernel:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      vswitch_name: "{{ item.vswitch_name }}"
+      portgroup_name: '{{ item.portgroup_name }}'
+      mtu: 9000
+      network:
+        type: 'static'
+        default_gateway: "{{ item.default_gateway }}"
+        ip_address: '{{ item.ip_address }}'
+        subnet_mask: '{{ item.subnet_mask }}'
+      state: "{{ state }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    loop:
+      - { vswitch_name: '{{ iscsi_vswitch }}', portgroup_name: '{{ iscsia_portgroup_name }}', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsia_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
+      - { vswitch_name: '{{ iscsi_vswitch }}', portgroup_name: '{{ iscsib_portgroup_name }}', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsib_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
+      - { vswitch_name: '{{ vm_vswitch }}', portgroup_name: '{{ vMotion_portgroup_name }}', default_gateway: '{{ vmotion_gateway }}', ip_address: '{{ vmotion_ip }}', subnet_mask: '{{ vmotion_subnet }}'}
+    when:
+      - state == "present"
+      - switch_type == "vss"
+
+
+
+
+
+  - name: Enable iSCSI on {{ esxi_hostname }}
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      state: enabled
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    when: state == "present"
+
+  - name: Gather iSCSI configuration information of ESXi host
+    community.vmware.vmware_host_iscsi_info:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    register: iscsi_info
+    when: state == "present"
+
+  - name: Add VMKernels to iSCSI config of ESXi
+    community.vmware.vmware_host_iscsi:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ esxi_hostname }}"
+      iscsi_config:
+        vmhba_name: "{{ iscsi_info.iscsi_properties.vmhba_name }}"
+        port_bind:
+          - vmk1
+          - vmk2
+      state: present
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    when:
+      - state == "present"
+
+  #- pause:
+
+
+  - name: Remove VMware vSwitch on {{ esxi_hostname }} for VSS
+    community.vmware.vmware_vswitch:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      switch_name: "{{ item.switch_name }}"
+      mtu: 9000
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    loop:
+      - { switch_name: '{{ iscsi_vswitch }}' }
+      - { switch_name: '{{ vm_vswitch }}' }
+    delegate_to: localhost
+    when:
+      - state == "absent"
+      - iscsi_vswitch != "vSwitch0"
+      - switch_type == "vss"
+      - number_of_host_uplinks == 6
+
+  #- name: Remove 2nd nic from vSwitch0
+  #  community.vmware.vmware_vswitch:
+  #    hostname: '{{ vcenter_hostname }}'
+  #    username: '{{ vcenter_username }}'
+  #    password: '{{ vcenter_password }}'
+  #    esxi_hostname: '{{ esxi_hostname }}'
+  #    switch_name: vSwitch0
+  #    nics:
+  #      - '{{ vswitch0_uplink1 }}'
+  #    mtu: 9000
+  #    validate_certs: "{{ validate_vm_certs | default(no) }}"
+  #  delegate_to: localhost
+  #  when:
+  #    - state == "absent"
+  #    - switch_type == "vss"
+
+  - debug: msg=" PAUSE> Do not continue until after removing 2nd vmnic manually. automation not working"
+    when:
+      - state == "absent"
+      - switch_type == "vss"
+  - pause:
+    when:
+      - state == "absent"
+      - switch_type == "vss"
+
+  - name: Remove {{ esxi_hostname }} from vCenter
+    community.vmware.vmware_host:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
+      esxi_hostname: '{{ esxi_hostname }}'
+      esxi_username: '{{ esxi_username }}'
+      esxi_password: '{{ esxi_password }}'
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+      state: "{{ state | default(present) }}"
+    delegate_to: localhost
+    when:
+      - state == "absent"
+
+
+
+  - name: Rescan HBA's for a given ESXi host and refresh storage system objects
+    community.vmware.vmware_host_scanhba:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      esxi_hostname: '{{ esxi_hostname }}'
+      refresh_storage: true
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
