@@ -648,7 +648,7 @@
       validate_certs: "{{ validate_vm_certs | default(no) }}"
       teaming:
         active_adapters:
-          - "{{ vswitch0_uplink2 }}"
+          - "{{ vswitch0_uplink1 }}"
       state: "present"
     delegate_to: localhost
     when:
