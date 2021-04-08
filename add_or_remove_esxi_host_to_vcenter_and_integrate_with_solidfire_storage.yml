@@ -11,8 +11,9 @@
 
   vars:
     sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
-    item: "{{ volname }}"
     state: present
+    validate_sf_certs: "False"
+    validate_vm_certs: no
 
 
   tasks:
@@ -636,42 +637,6 @@
       - switch_type == "vss"
       - number_of_host_uplinks == 6
 
-  - name: Remove 2nd adapter for Management port group of VSS
-    community.vmware.vmware_portgroup:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      esxi_hostname: '{{ esxi_hostname }}'
-      switch: "vSwitch0"
-      portgroup: "Management Network"
-      vlan_id: "{{ management_vlan_id }}"
-      validate_certs: "{{ validate_vm_certs | default(no) }}"
-      teaming:
-        active_adapters:
-          - "{{ vswitch0_uplink1 }}"
-      state: "present"
-    delegate_to: localhost
-    when:
-      - switch_type == "vss"
-      - state == "absent"
-      - management_portgroup_name is not defined
-
-  - name: Remove 2nd nic from vSwitch0
-    community.vmware.vmware_vswitch:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      esxi_hostname: '{{ esxi_hostname }}'
-      switch_name: vSwitch0
-      state: present
-      nics:
-        - '{{ vswitch0_uplink2 }}'
-      mtu: 9000
-      validate_certs: "{{ validate_vm_certs | default(no) }}"
-    delegate_to: localhost
-    when:
-      - state == "absent"
-      - switch_type == "vss"
 
   - debug: msg=" PAUSE> Do not continue until after removing 2nd vmnic manually. automation not working"
     when:

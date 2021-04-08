@@ -10,8 +10,9 @@
 
   vars:
     sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
-    item: "{{ volname }}"
     state: present
+    validate_sf_certs: "False"
+    validate_vm_certs: no
 
 
   tasks:
@@ -81,7 +82,7 @@
        username: "{{ elementsw_username }}"
        password: "{{ elementsw_password }}"
        state: "{{ state | default(present) }}"
-       name: "{{ item }}"
+       name: "{{ volname }}"
        qos: {minIOPS: "{{ min | default(1000) }}", maxIOPS: "{{ max | default(10000) }}", burstIOPS: "{{ burst | default(100000) }}"}
        account_id: "{{ account }}"
        size: "{{ volsize | default(2048) }}"
