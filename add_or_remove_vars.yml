@@ -10,7 +10,7 @@
 
     accessgroup: "NetApp-HCI-Ansible-Cluster"
     account: "{{ cluster_name }}"
-    volname: ansiblevolkp3
+    volname: ansible-ds01
 
     #optional QoS settings, otherwise will use 1000/15000/100000 and 2TB
     #min: 500

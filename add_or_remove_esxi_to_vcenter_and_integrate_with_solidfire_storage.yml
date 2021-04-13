@@ -538,6 +538,7 @@
       vswitch_name: "{{ item.vswitch_name }}"
       portgroup_name: '{{ item.portgroup_name }}'
       mtu: 9000
+      enable_vmotion: '{{ item.enable_vmotion }}'
       network:
         type: 'static'
         default_gateway: "{{ item.default_gateway }}"
@@ -547,9 +548,9 @@
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     loop:
-      - { vswitch_name: '{{ iscsi_vswitch }}', portgroup_name: '{{ iscsia_portgroup_name }}', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsia_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
-      - { vswitch_name: '{{ iscsi_vswitch }}', portgroup_name: '{{ iscsib_portgroup_name }}', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsib_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
-      - { vswitch_name: '{{ vm_vswitch }}', portgroup_name: '{{ vMotion_portgroup_name }}', default_gateway: '{{ vmotion_gateway }}', ip_address: '{{ vmotion_ip }}', subnet_mask: '{{ vmotion_subnet }}'}
+      - { vswitch_name: '{{ iscsi_vswitch }}', portgroup_name: '{{ iscsia_portgroup_name }}', enable_vmotion: 'no', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsia_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
+      - { vswitch_name: '{{ iscsi_vswitch }}', portgroup_name: '{{ iscsib_portgroup_name }}', enable_vmotion: 'no', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsib_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
+      - { vswitch_name: '{{ vm_vswitch }}', portgroup_name: '{{ vMotion_portgroup_name }}', enable_vmotion: 'yes', default_gateway: '{{ vmotion_gateway }}', ip_address: '{{ vmotion_ip }}', subnet_mask: '{{ vmotion_subnet }}'}
     when:
       - state == "present"
       - switch_type == "vss"
@@ -564,6 +565,7 @@
       dvswitch_name: "{{ item.dvswitch_name }}"
       portgroup_name: '{{ item.portgroup_name }}'
       mtu: 9000
+      enable_vmotion: '{{ item.enable_vmotion }}'
       network:
         type: 'static'
         default_gateway: "{{ item.default_gateway }}"
@@ -573,9 +575,9 @@
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     loop:
-      - { dvswitch_name: '{{ vds_name }}', portgroup_name: '{{ iscsia_portgroup_name }}', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsia_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
-      - { dvswitch_name: '{{ vds_name }}', portgroup_name: '{{ iscsib_portgroup_name }}', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsib_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
-      - { dvswitch_name: '{{ vds_name }}', portgroup_name: '{{ vMotion_portgroup_name }}', default_gateway: '{{ vmotion_gateway }}', ip_address: '{{ vmotion_ip }}', subnet_mask: '{{ vmotion_subnet }}'}
+      - { dvswitch_name: '{{ vds_name }}', portgroup_name: '{{ iscsia_portgroup_name }}', enable_vmotion: 'no', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsia_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
+      - { dvswitch_name: '{{ vds_name }}', portgroup_name: '{{ iscsib_portgroup_name }}', enable_vmotion: 'no', default_gateway: '{{ iscsi_gateway }}', ip_address: '{{ iscsib_ip }}', subnet_mask: '{{ iscsi_subnet }}'}
+      - { dvswitch_name: '{{ vds_name }}', portgroup_name: '{{ vMotion_portgroup_name }}', enable_vmotion: 'yes', default_gateway: '{{ vmotion_gateway }}', ip_address: '{{ vmotion_ip }}', subnet_mask: '{{ vmotion_subnet }}'}
     when:
       - state == "present"
       - switch_type == "vds"
