@@ -3,7 +3,7 @@ Project with two playbooks:
 add_or_remove_esxi playbook will create NetApp-HCI like configuration on a generic vCenter or scaling an existing NetApp HCI
 add_or_remove_solidfire takes the SolidFire portion of the above playbook for integrating SolidFire into an existing vCenter and/or adding additional SolidFire backed datastores into vCenter
 
-# add_or_remove_esxi_host_to_vcenter_and_integrate_with_solidfire_storage.yml
+# add_or_remove_esxi_to_vcenter_and_integrate_with_solidfire_storage.yml
 Add or remove ESXi host to vCenter Ansible playbook
   Create vCenter Datacenter
   Create vCenter Cluster
