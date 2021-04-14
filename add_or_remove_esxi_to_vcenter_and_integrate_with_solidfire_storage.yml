@@ -80,13 +80,16 @@
       password: "{{ vcenter_password }}"
       datacenter_name: "{{ datacenter_name }}"
       cluster_name: "{{ cluster_name }}"
+      ignore_drs: True
+      ignore_ha: True
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     register: cl_result
     delegate_to: localhost
     when:
       - state == "present"
+  #- debug: msg="results printed are {{ cl_result.changed }}"
 
-  - name: Enable HA and VM monitoring without admission control
+  - name: Enable HA and VM monitoring without admission control for new Cluster
     community.vmware.vmware_cluster_ha:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -99,8 +102,9 @@
     delegate_to: localhost
     when:
       - state == "present"
+      - cl_result.changed == "True"
 
-  - name: Enable DRS and set default VM behavior to fully automated
+  - name: Enable DRS and set default VM behavior to fully automated for new Cluster
     community.vmware.vmware_cluster_drs:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -113,6 +117,7 @@
     delegate_to: localhost
     when:
       - state == "present"
+      - cl_result.changed == "True"
 
 
   - name: Add ESXi Host to vCenter
@@ -155,10 +160,10 @@
       password: '{{ vcenter_password }}'
       datacenter: '{{ datacenter_name }}'
       switch: "{{ vds_name }}"
-      version: 6.5.0
+      version: 6.6.0
       mtu: 9000
       uplink_quantity: 2
-      uplink_prefix: 'Uplink_'
+      uplink_prefix: 'Uplink '
       discovery_protocol: lldp
       discovery_operation: both
       multicast_filtering_mode: basic
@@ -168,6 +173,51 @@
     when:
       - state == "present"
       - switch_type == "vds"
+      - existing_switch == "no"
+
+  - name: Enable NIOC on VDS
+    community.vmware.vmware_dvswitch_nioc:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      switch: "{{ vds_name }}"
+      version: version3
+      resources:
+        - name: iSCSI
+          shares_level: custom
+          shares: 100
+      state: present
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vds"
+      - existing_switch == "no"
+
+  - name: Configure Uplink portgroup on VDS
+    community.vmware.vmware_dvswitch_uplink_pg:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      switch: "{{ vds_name }}"
+      name: "{{ vds_uplink_name | default('VDS Uplinks')}}"
+      advanced:
+        port_config_reset_at_disconnect: True
+        block_override: True
+        vendor_config_override: True
+        vlan_override: True
+        netflow_override: True
+        traffic_filter_override: False
+      vlan_trunk_range:
+        - '0-4094'
+      netflow_enabled: False
+      block_all_ports: False
+      validate_certs: "{{ validate_vm_certs | default(no) }}"
+    delegate_to: localhost
+    when:
+      - state == "present"
+      - switch_type == "vds"
+      - existing_switch == "no"
 
   - name: Create portgroups for VDS
     community.vmware.vmware_dvs_portgroup:
@@ -177,22 +227,26 @@
       switch_name: "{{ vds_name }}"
       portgroup_name: "{{ item.portgroup_name }}"
       vlan_id: "{{ item.vlan_id }}"
-      num_ports: 120
+      num_ports: 8
       portgroup_type: earlyBinding
       state: present
       port_policy:
         block_override: true
         vlan_override: true
         security_override: true
+        vendor_config_override: true
+        shaping_override: "{{ item.shaping_override | default('false') }}"
+        uplink_teaming_override: "{{ item.uplink_teaming_override | default('false') }}"
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     loop:
       - { portgroup_name: '{{ vds_management_portgroup_name }}', vlan_id: '{{ vds_management_vlan_id }}' }
-      - { portgroup_name: '{{ VM_network_portgroup_name }}', vlan_id: '{{ VM_network_vlan_id }}' }
-      - { portgroup_name: '{{ vMotion_portgroup_name }}', vlan_id: '{{ vMotion_vlan_id }}' }
+      - { portgroup_name: '{{ VM_network_portgroup_name }}', vlan_id: '{{ VM_network_vlan_id }}', shaping_override: 'true', uplink_teaming_override: 'true'}
+      - { portgroup_name: '{{ vMotion_portgroup_name }}', vlan_id: '{{ vMotion_vlan_id }}', shaping_override: 'true', uplink_teaming_override: 'true' }
     delegate_to: localhost
     when:
       - state == "present"
       - switch_type == "vds"
+      - existing_switch == "no"
 
   - name: Create portgroups for iSCSI VDS
     community.vmware.vmware_dvs_portgroup:
@@ -202,25 +256,27 @@
       switch_name: "{{ vds_name }}"
       portgroup_name: "{{ item.portgroup_name }}"
       vlan_id: "{{ item.vlan_id }}"
-      num_ports: 120
+      num_ports: 8
       portgroup_type: earlyBinding
       state: present
       port_policy:
         block_override: true
         vlan_override: true
         security_override: true
-        uplink_teaming_override: true
+        vendor_config_override: true
+        uplink_teaming_override: false
       teaming_policy:
-        load_balance_policy: 'failover_explicit'
+        load_balance_policy: 'loadbalance_srcid'
         active_uplinks: ['{{ item.activeNic }}']
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     loop:
-      - { portgroup_name: '{{ iscsia_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', activeNic: 'Uplink_2' }
-      - { portgroup_name: '{{ iscsib_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', activeNic: 'Uplink_1' }
+      - { portgroup_name: '{{ iscsia_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', activeNic: 'Uplink 2' }
+      - { portgroup_name: '{{ iscsib_portgroup_name }}', vlan_id: '{{ iscsi_vlan_id }}', activeNic: 'Uplink 1' }
     delegate_to: localhost
     when:
       - state == "present"
       - switch_type == "vds"
+      - existing_switch == "no"
 
   - name: Unmount VMFS datastores to ESXi
     vmware_host_datastore:
@@ -260,14 +316,14 @@
       current_switch_name: vSwitch0
       current_portgroup_name: Management Network
       migrate_switch_name: "{{ vds_name }}"
-      migrate_portgroup_name: Management Network
+      migrate_portgroup_name: "{{ default_management_network | default('Management Network') }}"
       validate_certs: "{{ validate_vm_certs | default(no) }}"
     delegate_to: localhost
     when:
       - state == "present"
       - switch_type == "vds"
 
-  - name: Delete VMkernel ports from VDS
+  - name: Delete VMkernel ports from ESXi host from VDS
     community.vmware.vmware_vmkernel:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -330,6 +386,7 @@
     when:
       - state == "absent"
       - switch_type == "vds"
+      - existing_switch == "no"
 
   - name: Remove VMware vSwitch0 from VDS setup
     community.vmware.vmware_vswitch:

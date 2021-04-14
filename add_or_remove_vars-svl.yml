@@ -2,7 +2,7 @@
 # Variables used for add_or_remove_host_to_vcenter_and_integrate_with_solidfire_storage (all sections)
 # Variables used for add_or_remove_solidfire_backed_datastores_and_setup_connections_to_esxi.yml (SolidFire section only)
 ######################################################################################################################
-
+Example file for scaling into existing NetApp HCI VDS switch
 ######################################################################################################################
 # SolidFire variables required for connecting SolidFire to VMware #ansible-kp-connect-sf-to-vmware.yml
 ######################################################################################################################
@@ -32,15 +32,15 @@
     #uncomment if you want to add an additional management port group to vSwitch0 for VSS
     #management_portgroup_name: HCI_Management_Port_Group
     #management_vlan_id: 89
-
-    vMotion_portgroup_name: "vMotion"
+    default_management_network: "Management Network 89"
+    vMotion_portgroup_name: "NetApp HCI VDS 01-vMotion"
     vMotion_vlan_id: 89
 
-    VM_network_portgroup_name: "VM_Network"
+    VM_network_portgroup_name: "NetApp HCI VDS 01-VM_Network"
     VM_network_vlan_id: 89
 
-    iscsia_portgroup_name: "iSCSI-A"
-    iscsib_portgroup_name: "iSCSI-B"
+    iscsia_portgroup_name: "NetApp HCI VDS 01-iSCSI-A"
+    iscsib_portgroup_name: "NetApp HCI VDS 01-iSCSI-B"
     iscsi_vlan_id: 91
 
 # ESXi host Networking Requirements from ESXi hostname as defined in .secrets.yml file
@@ -48,7 +48,9 @@
 # switch_type can be either "vds" or "vss" but for VDS automation is only setup to migrate over 2 uplinks
     number_of_host_uplinks: 2
     switch_type: "vds"
-    existing_switch: "no"
+
+# existing_switch: yes if you are migrating host into existing VDS, no if not.
+    existing_switch: "yes"
 
 # esxi_hostname: uncomment to override .secrets.yml for additional hosts
     esxi_hostname: "winf-evo3-blade4.ntaplab.com"
@@ -62,9 +64,10 @@
     vmotion_subnet: 255.255.255.0
 
 #VDS specific variables variables
-    vds_name: "NetApp Ansible VDS"
-    vds_management_portgroup_name: "Management Network"
+    vds_name: "NetApp HCI VDS 01"
+    vds_management_portgroup_name: "Management Network 89"
     vds_management_vlan_id: 89
+    vds_uplink_name: "NetApp HCI Uplinks 01"
 
 #2-cable or 6-cable VSS variables for ESXi Host
     vswitch0_uplink1: vmnic0
