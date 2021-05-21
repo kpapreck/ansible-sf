@@ -1,0 +1,71 @@
+---
+- hosts: localhost
+  vars_files:
+  - '.secrets.yml'
+
+  collections:
+    - netapp.elementsw
+
+  vars:
+   id: "1"
+   nodeid: nodeName
+   cluster_name: sfcluster
+   mvip:
+   svip:
+   node1_mip:
+   node2_mip:
+   node3_mip:
+   node4_mip:
+   node5_mip:
+   node6_mip:
+   node7_mip:
+   node8_mip:
+   node1_sip:
+   node2_sip:
+   node3_sip:
+   node4_sip:
+   node5_sip:
+   node6_sip:
+   node7_sip:
+   node8_sip:
+   serialnumber:
+   ordernumber:
+
+
+
+
+  tasks:
+  - name: Set cluster name on ElementOS Nodes
+    na_elementsw_node:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      state: present
+      node_ids: "{{ node1_ip }}","{{ node2_ip }}","{{ node3_ip }}","{{ node4_ip }}","{{ node5_ip }}","{{ node6_ip }}","{{ node7_ip }}","{{ node8_ip }}"
+      cluster_name: "{{ cluster_name }}"
+      preset_only: true
+
+
+  - name: Create eSDS cluster
+    na_elementsw_cluster:
+      hostname: "{{ elementsw_hostname }}"
+      username: "{{ elementsw_username }}"
+      password: "{{ elementsw_password }}"
+      management_virtual_ip: "{{ mvip }}"
+      storage_virtual_ip: " {{ svip }}"
+      replica_count: 2
+      accept_eula: true
+      serial_number: "{{ serialnumber }}"
+      order_number: "{{ ordernumber }}"
+      cluster_admin_username: "{{ cluster_admin_username }}"
+      cluster_admin_password: "{{ cluster_admin_password }}"
+
+      nodes:
+      - "{{ node1_sip }}"
+      - "{{ node2_sip }}"
+      - "{{ node3_sip }}"
+      - "{{ node4_sip }}"
+      - "{{ node5_sip }}"
+      - "{{ node6_sip }}"
+      - "{{ node7_sip }}"
+      - "{{ node8_sip }}"
