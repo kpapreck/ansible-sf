@@ -21,7 +21,7 @@
     netapp_svm: "ansiblereplication"
     netapp_aggregate: "aggr1_winfclus02_02"
     mirrored: "True"
-    sf_url: "https://10.45.91.60/json-rpc/11.0/"
+    sf_url: "https://{{ elementsw_hostname }}/json-rpc/11.0/"
     hostIQN: 
       - IQN: "iqn.1996-04.de.suse:01:9c83a3e15f64"  
       - IQN: "iqn.1996-04.de.suse:01:9c83a3e15f65"  
