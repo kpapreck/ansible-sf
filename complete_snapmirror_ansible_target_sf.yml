@@ -1,0 +1,622 @@
+---
+- hosts: localhost
+  vars_files:
+   - 'sfsecret.yml'
+
+  vars:
+    volbase: "kp-server01-db"
+    account: "{{ volbase }}"
+    db_size_gb: "3"
+    log_size_gb: "1"
+    bin_size_gb: "1"
+    min: "50"
+    max: "35000"
+    burst: "45000"
+    secret: "ThIsIs$eCrEt"
+    state: "present"
+    data_lun_count: 3 
+    log_lun_count: 2
+    bin_lun_count: 0 
+    netapp_svm: "ansiblereplication"
+    netapp_aggregate: "aggr1_winfclus02_02"
+    mirrored: "True"
+    sf_url: "https://10.45.91.60/json-rpc/11.0/"
+    hostIQN: 
+      - IQN: "iqn.1996-04.de.suse:01:9c83a3e15f64"  
+      - IQN: "iqn.1996-04.de.suse:01:9c83a3e15f65"  
+ 
+
+    data_volume: {volname: "{{ volbase }}-data", count: "{{ data_lun_count }}",size: "{{ db_size_gb }}"}
+    log_volume: {volname: "{{ volbase }}-log", count: "{{ log_lun_count }}",size: "{{ log_size_gb }}"}
+    bin_volume: {volname: "{{ volbase }}-bin", count: "{{ bin_lun_count }}",size: "{{ db_size_gb }}"} 
+
+  tasks:
+   - name: Create New Account "{{ volbase }}"
+     na_elementsw_account:
+       hostname: "{{ hostname }}"
+       username: "{{ username }}"
+       password: "{{ password }}" 
+       state: "{{ state }}"
+       element_username: "{{ account }}"
+       initiator_secret: "{{ secret }}" 
+     when: state == "present"
+
+   - name: Get Account Info 
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "GetAccountByName","params": {"username": "{{ volbase }}"},"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonAccountResults
+ 
+   - name: Create or remove data volume
+     na_elementsw_volume:
+       hostname: "{{ hostname }}"
+       username: "{{ username }}"
+       password: "{{ password }}" 
+       state: "{{ state }}"
+       name: "{{ item }}"
+       qos: {minIOPS: "{{ min }}", maxIOPS: "{{ max }}", burstIOPS: "{{ burst }}"}
+       account_id: "{{ account }}"
+       size: "{{ data_volume.size }}"
+       size_unit: gb
+       enable512e: True
+     with_sequence: count={{ data_volume.count }} format={{ data_volume.volname }}%02x
+     register: volumes
+
+   - name: Create or remove Log volumes
+     na_elementsw_volume:
+       hostname: "{{ hostname }}"
+       username: "{{ username }}"
+       password: "{{ password }}" 
+       state: "{{ state }}"
+       name: "{{ item }}"
+       qos: {minIOPS: "{{ min }}", maxIOPS: "{{ max }}", burstIOPS: "{{ burst }}"}
+       account_id: "{{ account }}"
+       size: "{{ log_volume.size }}"
+       size_unit: gb
+       enable512e: True
+     with_sequence: count={{ log_volume.count }} format={{ log_volume.volname }}%02x
+     register: volumes
+
+   - name: Create or remove Bin volumes
+     na_elementsw_volume:
+       hostname: "{{ hostname }}"
+       username: "{{ username }}"
+       password: "{{ password }}" 
+       state: "{{ state }}"
+       name: "{{ item }}"
+       qos: {minIOPS: "{{ min }}", maxIOPS: "{{ max }}", burstIOPS: "{{ burst }}"}
+       account_id: "{{ account }}"
+       size: "{{ bin_volume.size }}"
+       size_unit: gb
+       enable512e: True
+     with_sequence: count={{ bin_volume.count }} format={{ bin_volume.volname }}%02x
+     register: volumes
+
+   - name: Create or remove Access group
+     na_elementsw_access_group:
+       hostname: "{{ hostname }}"
+       username: "{{ username }}"
+       password: "{{ password }}" 
+       state: "{{ state }}"
+       name: "{{ account }}"
+       account_id: "{{ account }}"
+     register: results
+     when: state == "present"
+
+   - name: Get Access group ID
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ListVolumeAccessGroups","params": {} ,"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonVolAccResults
+
+   - name: Set Volume Access Groups ID
+     set_fact:
+       VolAccGrpID: "{{ item.volumeAccessGroupID }}"
+     with_items: "{{ jsonVolAccResults.json.result.volumeAccessGroups }}"
+     when:
+       - item.name == volbase  
+
+   - name: Delete Account "{{ volbase }}"
+     na_elementsw_account:
+       hostname: "{{ hostname }}"
+       username: "{{ username }}"
+       password: "{{ password }}" 
+       state: "{{ state }}"
+       element_username: "{{ account }}"
+       initiator_secret: "{{ secret }}" 
+     when: state == "absent"
+
+   - name: Get Account info by Name
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method":"GetAccountByName","params": {"username": "{{ volbase }}" },"id": 9191}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonAccountResult 
+  
+   - name: Set acccount id set_fact
+     set_fact:
+       AccountID: "{{ jsonAccountResult.json.result.account.accountID }}"
+     when: state == "present"
+
+   - name: Get Volumes By Account
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ListVolumesForAccount","params": {"accountID": "{{ AccountID }}" },"id": 9191}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonvolResult 
+     when: state == "present"
+
+   - name: Set Volume ids
+     set_fact: 
+       AccountVolIDS: "{{ jsonvolResult.json.result.volumes | map(attribute='volumeID') | list }}"
+     when: state == "present"
+
+   - name: Get QOS Policies
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ListQoSPolicies","params": {} ,"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonqosResults
+
+   - name: Set Qos Policy ID
+     set_fact:
+       qosPolicyID: "{{ item.qosPolicyID }}"
+     with_items: "{{ jsonqosResults.json.result.qosPolicies }}"
+     when:
+       - item.name == volbase  
+       - state == "present"
+
+   - name: Create QOS Policy
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: {"method": "CreateQoSPolicy", "params": { "name": "{{ volbase }}", "qos": {"minIOPS": "{{ min }}","maxIOPS": "{{ max }}","burstIOPS": "{{ burst }}"}},"id": 2112} 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonqosPolicyCRResults
+     when: 
+       - state == "present"
+       - qosPolicyID is not defined
+
+   - name: Get QOS Policies
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ListQoSPolicies","params": {} ,"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonqosResults
+     when:
+       - state == "present"
+       - jsonqosPolicyCRResults is defined
+
+   - name: Set Qos Policy ID 2
+     set_fact:
+       qosPolicyID: "{{ item.qosPolicyID }}"
+     with_items: "{{ jsonqosResults.json.result.qosPolicies }}"
+     when:
+       - state == "present"
+       - item.name == volbase  
+       - jsonqosPolicyCRResults is defined
+
+   - name: Set Volume QOS Policy and enable snapmirroron all Volumes in Account {{ AccountID }} 
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ModifyVolumes","params": {"volumeIDs": {{ AccountVolIDS }},"enableSnapMirrorReplication": true ,"qosPolicyID": "{{ qosPolicyID }}" } ,"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonqossetResults
+     when:
+       - state == "present"
+       - qosPolicyID is defined
+
+   - name: Remove QOS Policy
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "DeleteQoSPolicy","params": {"qosPolicyID": "{{ qosPolicyID }}"},"id": 2112}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     when:
+       - state == "absent"
+       - qosPolicyID is defined
+
+
+   - name: Set Volume Access Group
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "AddVolumesToVolumeAccessGroup","params": {"volumeAccessGroupID": "{{ VolAccGrpID }}","volumes": {{ AccountVolIDS }} } ,"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     when:
+       - state == "present"
+       - VolAccGrpID is defined
+
+   - name: Remove Volume Access Group
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "DeleteVolumeAccessGroup","params": {"volumeAccessGroupID": "{{ VolAccGrpID }}","deleteOrphanInitiators": true },"id": 2112}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     when:
+       - state == "absent"
+       - VolAccGrpID is defined
+
+
+   - name: Add Inititator to Access Group
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "AddInitiatorsToVolumeAccessGroup", "params": {"volumeAccessGroupID": "{{ VolAccGrpID }}", "initiators": ["{{ item.IQN }}"]}, "id" : 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonagupdateResults
+     with_items: "{{ hostIQN }}"
+     when:
+       - VolAccGrpID is defined
+       - state == "present"
+
+
+# Create Ontap Mirrors
+
+   - name: Create SVM
+     na_ontap_svm:
+       state: "{{ state }}"
+       name: "{{ netapp_svm }}"
+       root_volume_security_style: "unix"
+       hostname: "{{ netapp_hostname }}"
+       username: "{{ netapp_username }}"
+       password: "{{ netapp_password }}"
+       https: true
+       validate_certs: false
+     when:
+       - mirrored|bool
+       - state == "present"
+
+   - name: Get Snapmirror connection
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ListSnapMirrorEndpoints","params": {},"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonSmAccResults
+     when:
+       - mirrored|bool
+
+   - name: Set Snapmirror Account id
+     set_fact:
+       SmAccountID: "{{ item.snapMirrorEndpointID }}"
+     with_items: "{{ jsonSmAccResults.json.result.snapMirrorEndpoints }}"
+     when:
+       - item.managementIP == netapp_hostname
+       - mirrored|bool
+
+   - name: Get Snapmirror Relationships for delete
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ListSnapMirrorRelationships","params": {"snapMirrorEndpointID": "{{ SmAccountID }}" },"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonSMRelateResults
+     when:
+       - state == "absent"
+       - mirrored|bool
+
+   - name: Get Snapshot Schedules
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ListSchedules","params": {},"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonSnapshotScheduleResults
+     when:
+       - mirrored|bool
+
+   - name: Set SnapshotID for Account
+     set_fact:
+       SnapshotID: "{{ item.scheduleID }}" 
+     with_items: "{{ jsonSnapshotScheduleResults.json.result.schedules }}"
+     when:
+       - item.scheduleName == volbase
+       - mirrored|bool
+
+   - name: Delete Snapmirror Relationships from SF and Ontap
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "DeleteSnapMirrorRelationships","params": {"snapMirrorEndpointID": "{{ SmAccountID }}" ,"destinationVolumes": [{"type": "ontap","name": "{{ item.destinationVolume.name }}","vserver": "{{ netapp_svm }}"}]},"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     with_items: "{{ jsonSMRelateResults.json.result.snapMirrorRelationships }}"
+     when:
+       - SmAccountID is defined
+       - state == "absent"
+       - mirrored|bool
+
+   - name: Get snapshot schedules 
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ListSchedules","params": {}, "id": 2112}'      
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonSnapshotScheduleResults
+     when:
+       - mirrored|bool
+       - state == "absent"
+
+   - name: Delete snapshot schedule
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ModifySchedule","params": {"scheduleID": {{ item.scheduleID }},"toBeDeleted": true}, "id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     with_items: "{{ jsonSnapshotScheduleResults.json.result.schedules }}"
+     when:
+       - state == "absent"
+       - item.scheduleName == volbase
+       - mirrored|bool
+
+   - name: Create or remove Ontap Data volume
+     na_ontap_volume:
+       hostname: "{{ netapp_hostname }}"
+       username: "{{ netapp_username }}"
+       password: "{{ netapp_password }}" 
+       validate_certs: false
+       state: "{{ state }}"
+       name: "{{ item | replace('-','_') }}"
+       vserver: "{{ netapp_svm }}"
+       aggregate_name: "{{ netapp_aggregate }}"
+       type: "dp"
+       space_guarantee: "none"
+       size: "{{ data_volume.size }}"
+       size_unit: gb
+     with_sequence: count={{ data_volume.count }} format=sfmir_{{ data_volume.volname }}%02x
+     register: ontapdatavolumes
+     when:
+       - mirrored|bool
+
+   - name: Create or remove Ontap Log volume
+     na_ontap_volume:
+       hostname: "{{ netapp_hostname }}"
+       username: "{{ netapp_username }}"
+       password: "{{ netapp_password }}" 
+       validate_certs: false
+       state: "{{ state }}"
+       name: "{{ item  | replace('-','_') }}"
+       vserver: "{{ netapp_svm }}"
+       aggregate_name: "{{ netapp_aggregate }}"
+       type: "dp"
+       space_guarantee: "none"
+       size: "{{ log_volume.size }}"
+       size_unit: gb
+     with_sequence: count={{ log_volume.count }} format=sfmir_{{ log_volume.volname }}%02x
+     register: ontaplogvolumes
+     when:
+       - mirrored|bool
+
+   - name: Create or remove Ontap Bin volume
+     na_ontap_volume:
+       hostname: "{{ netapp_hostname }}"
+       username: "{{ netapp_username }}"
+       password: "{{ netapp_password }}" 
+       validate_certs: false
+       state: "{{ state }}"
+       name: "{{ item | replace('-','_') }}"
+       vserver: "{{ netapp_svm }}"
+       aggregate_name: "{{ netapp_aggregate }}"
+       type: "dp"
+       space_guarantee: "none"
+       size: "{{ bin_volume.size }}"
+       size_unit: gb
+     with_sequence: count={{ bin_volume.count }} format=sfmir_{{ bin_volume.volname }}%02x
+     register: ontapbinvolumes
+     when:
+       - mirrored|bool
+ 
+   - name: Create and Assign snapshot schedule with daily updates label
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "CreateSchedule","params": {"scheduleName": "{{ volbase }}","scheduleType": "snapshot","scheduleInfo": {"name": "{{ volbase }}","volumes": {{ AccountVolIDS }},"retention": "480:0:00","snapMirrorLabel": "daily"},"paused": false,"recurring": true,"hours": 23,"minutes": 0,"weekdays": [{"day": 0,"offset": 1},{"day": 1,"offset": 1},{"day": 2,"offset": 1},{"day": 3,"offset": 1},{"day": 4,"offset": 1},{"day": 5,"offset": 1},{"day": 6,"offset": 1}],"attributes": {"frequency": "Days Of Week"}},"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonSnapshotScheduleResults
+     when:
+       - mirrored|bool
+       - SnapshotID is not defined
+       - state == "present"
+
+   - name: Create Snapmirror connection if required
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "CreateSnapMirrorEndpoint","params": {"managementIP": "{{ netapp_hostname }}", "username": "{{ netapp_username }}","password": "{{ netapp_password }}"},"id": 2112}'
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     when:
+      - SmAccountID is not defined
+      - mirrored|bool
+
+   - name: Get Snapmirror connection after created
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "ListSnapMirrorEndpoints","params": {},"id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonSmAccResults
+     when: 
+       - state == "present"
+       - SmAccountID is not defined
+       - mirrored|bool
+
+   - name: Set Snapmirror Account id after creaated
+     set_fact:
+       SmAccountID: "{{ item.snapMirrorEndpointID }}"
+     with_items: "{{ jsonSmAccResults.json.result.snapMirrorEndpoints }}"
+     when:
+       - SmAccountID is not defined
+       - item.managementIP == netapp_hostname
+       - mirrored|bool
+
+   - name: Create Snapmirror Relationships from SF
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "CreateSnapMirrorRelationship","params": {"snapMirrorEndpointID": "{{ SmAccountID }}" ,"sourceVolume": {"type": "solidfire", "volumeID": {{ item.volumeID }}, "name": "{{ item.name }}"}, "destinationVolume": {"type": "ontap", "name": "sfmir_{{ item.name | replace("-","_") }}", "vserver": "{{ netapp_svm }}"},"scheduleName": "8hour", "policyName": "MirrorAndVault"}, "id": 2112}' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonSMCreateResult
+     with_items: "{{ jsonvolResult.json.result.volumes }}"
+     when:
+       - state == "present"
+       - mirrored|bool
+
+   - name: Initialize SnapMirror Relationship From SF
+     uri:
+      url: "{{ sf_url }}"
+      method: POST
+      validate_certs: False
+      user: "{{ username }}"
+      password: "{{ password }}"
+      body: '{"method": "InitializeSnapMirrorRelationship","params": {"snapMirrorEndpointID": "{{ SmAccountID }}", "destinationVolume": { "name": "sfmir_{{ item.name |replace("-","_") }}", "type": "ontap","vserver": "{{ netapp_svm }}"}},  "id": 2112 }' 
+      force_basic_auth: yes
+      status_code: 200
+      body_format: json
+      return_content: yes
+     register: jsonSmInitResults
+     with_items: "{{ jsonvolResult.json.result.volumes }}"
+     when:
+       - state == "present"
+       - mirrored|bool
+
