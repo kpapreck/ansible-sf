@@ -1,7 +1,8 @@
 ---
 - hosts: localhost
   vars_files:
-   - 'sfsecret.yml'
+   #- 'sfsecret.yml'
+   - 'sfsecret-generic-for-complete_snapmirror_ansible_target_sf.yml'
 
   vars:
     volbase: "kp-server01-db"
